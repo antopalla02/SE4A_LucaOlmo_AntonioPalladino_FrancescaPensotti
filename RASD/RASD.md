@@ -31,8 +31,8 @@ Software Engineering for Automation — A.Y. 2025-2026
     - [1.3.2 Acronyms and abbreviations](#132-acronyms-and-abbreviations)
   - [1.4 Document structure](#14-document-structure)
 - 2\. Overall description *(TBD)*
-  - 2.1 Scenarios
-  - 2.2 Domain model
+  - [2.1 Scenarios](#21-scenarios)
+  - [2.2 Domain model](#22-domain-model)
   - 2.3 User characteristics
   - 2.4 Product functions
   - 2.5 Non-functional aspects
@@ -285,7 +285,7 @@ The flows above span every shared phenomenon listed in Sec. 1.2.2 at least once:
 
 This section formalises the entities of the application domain and the relationships between them. The model is intentionally kept at the conceptual level: it captures *what* the system has to talk about, not *how* it stores it. Figure 1 shows the resulting UML class diagram. 
 
-![Domain model — Figure 1](images/UML_domain_model.png)
+![Domain model — Figure 1](images/UML_domainmodel.png)
 
 **Actors and roles.** Every person registered on the platform is a `User`. The two roles a user can have, *Client* and *Freelancer*, are modelled as subclasses: a `User` is exactly one of the two and the role is fixed at registration time. The attributes that are common to both (e.g. email, registration date, reputation) live in `User`; the role-specific attributes — business-related fields for `Client`, hourly rate and portfolio for `Freelancer` — live in the respective subclasses.
 
