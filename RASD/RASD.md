@@ -309,3 +309,155 @@ This section formalises the entities of the application domain and the relations
 
 ---
 
+### 2.3 User characteristics
+
+The system has two end-user classes. Although both interact with the platform through the same web client and share the authentication facility, they exercise disjoint sets of functional requirements, have different incentives, and contribute different inputs to the matching procedure. Characterising them here helps motivate the requirements in Sec. 2.4 and the usability targets in Sec. 2.5.3.
+
+#### 2.3.1 Client
+
+A client is the party that commissions the work. In the most common instantiation a client is a small or medium business (agency, studio, SME) without an internal capacity for a specific task, but the model is the same for an individual commissioning a one-off piece of work. The system makes no distinction between organisational and individual clients beyond the `businessName` field of the profile.
+
+- **Skill level.** Clients are expected to be able to articulate what they need in terms of required `Skill`s; the platform supplies the controlled vocabulary of skills (with a request mechanism for missing entries, see S1 exceptions) so that the input is structured rather than free text.
+- **Frequency of use.** A client interacts intensively with the platform during three short windows of the project lifecycle (publication, inspection of proposals, completion) and not at all in between. The functional requirements concerning notifications and dashboards (Sec. 2.4.6) are calibrated on this pattern: the client is brought back into the system by the notifications, not by polling.
+- **Primary inputs.** Project descriptions (free text), required skills (from controlled vocabulary), budget (numeric), application deadline (date), choice of proposal (selection).
+- **Primary outputs received.** Ranked lists of candidate freelancers, proposals received, notifications, the personal dashboard with the state of own projects.
+
+#### 2.3.2 Freelancer
+
+A freelancer is the party that performs the work. The system assumes that freelancers are autonomous professionals rather than employees of an agency (no organisational hierarchy is modelled).
+
+- **Skill level.** Freelancers are expected to know their own profession well enough to characterise their skills with a mastery level out of three (`basic` / `intermediate` / `advanced`). The granularity is intentionally coarse so that the input is robust against optimistic self-evaluation and remains useful to the matching.
+- **Frequency of use.** A freelancer is expected to interact with the platform more frequently than a client: profile maintenance, inspection of suggested projects, application to one or more of them, follow-up on pending proposals. The non-functional requirements on the responsiveness of the freelancer-side views (Sec. 2.5.1) are calibrated accordingly.
+- **Primary inputs.** Profile attributes (skills with mastery, hourly rate, availability windows, portfolio link), proposals (cover letter and offer), reviews on the counterpart after a completed collaboration.
+- **Primary outputs received.** Ranked list of suggested projects, status of own proposals (pending, accepted, rejected), notifications, personal dashboard.
+
+---
+
+### 2.4 Product functions
+
+This section enumerates the functional requirements of the system. Requirements are labelled `R1`, `R2`, …, and are grouped by macro-area so that each cluster corresponds to a coherent slice of the system. Within each group, every requirement is stated in a single "shall" sentence; cross-references to the scenarios of Sec. 2.1, to the goals of Sec. 1.1, to the shared phenomena of Sec. 1.2.2 and to the domain invariants of Sec. 2.2 are collected in the traceability matrix of Sec. 2.4.7.
+
+#### 2.4.1 Account and profile management
+
+- **R1** — The system shall allow an unregistered visitor to register an account by providing an email address, a password and a role chosen between `client` and `freelancer`.
+- **R2** — The system shall reject any registration attempt whose email is already associated to another account.
+- **R3** — The system shall allow a registered `Client` to maintain a profile containing at least: business name, sector, typical needs.
+- **R4** — The system shall allow a registered `Freelancer` to maintain a profile containing at least: a non-empty set of `Competence`s (each pairing a `Skill` and a mastery level), an hourly rate, a non-empty set of `Availability` windows and an optional portfolio link.
+- **R5** — The system shall allow any registered user to update their profile at any time and shall persist the change before returning control to the user.
+- **R6** — The system shall maintain a controlled vocabulary of `Skill`s and shall reject any `Competence` whose `Skill` is not in the vocabulary; the system shall offer a request mechanism for the addition of a new `Skill`, subject to administrator approval.
+
+#### 2.4.2 Project lifecycle
+
+- **R7** — The system shall allow a `Client` to publish a `Project` by providing a title, a textual description, a non-empty set of required `Skill`s, a maximum budget greater than or equal to zero and an application deadline strictly in the future.
+- **R8** — The system shall set the `status` of a newly published `Project` to `open`.
+- **R9** — The system shall allow a `Freelancer` to submit a `Proposal` for a `Project` only if the `Project` has `status = open` and the application deadline has not expired.
+- **R10** — The system shall reject any second `Proposal` submitted by the same `Freelancer` for the same `Project` (DOM1).
+- **R11** — The system shall allow the `Client` owner of a `Project` to accept exactly one of the `Proposal`s received for that `Project`, provided the `Project` has `status = open`.
+- **R12** — Upon acceptance of a `Proposal`, the system shall atomically: (i) set that `Proposal`'s `status` to `accepted`; (ii) set every other `Proposal` of the same `Project` from `status = pending` to `status = rejected`; (iii) set the `Project`'s `status` to `inProgress` (DOM2, DOM3).
+- **R13** — The system shall refuse any submission of new `Proposal`s targeting a `Project` whose `status` is not `open`.
+- **R14** — The system shall allow the `Client` owner of an in-progress `Project` to mark the `Project` as completed; the system shall then set the `Project`'s `status` to `completed` (DOM4).
+
+#### 2.4.3 Matching
+
+- **R15** — Upon the publication of a `Project`, the system shall compute a ranking of `Freelancer`s ordered by decreasing compatibility score *S(P,F)*, truncated to a configurable number *N*, and shall expose this ranking to the `Client` owner of the `Project`.
+- **R16** — Upon every creation or update of a `Freelancer`'s profile, the system shall recompute the ranking of compatible open `Project`s for that freelancer and shall expose it on the freelancer's "suggested projects" view.
+- **R17** — Upon every creation or update of a `Freelancer`'s profile that may affect open projects (e.g. addition of a new competence), the system shall recompute the corresponding rankings of those open `Project`s.
+- **R18** — The system shall implement the compatibility score *S(P,F)* as a weighted combination of four sub-scores — skills coverage, budget compatibility, reputation, availability — each normalised in `[0,1]`, with weights summing to one and configurable by the administrator.
+- **R19** — The system shall exclude a `Freelancer` from the ranking before computing *S(P,F)* if the freelancer fails any active *hard filter* (e.g. budget overrun beyond the configured tolerance).
+- **R20** — The system shall expose the matching procedure behind a strategy interface and shall support the substitution of the active strategy via configuration alone, without recompilation or redeployment of unrelated modules (this requirement is the operational form of `G5`).
+
+#### 2.4.4 Manual search
+
+- **R21** — The system shall provide, to every authenticated `Client`, a search facility over the catalogue of `Freelancer`s with filters on required `Skill`s, hourly-rate range and availability window.
+- **R22** — The system shall provide, to every authenticated `Freelancer`, a search facility over the catalogue of open `Project`s with filters on required skill set, budget range and application-deadline window.
+- **R23** — The system shall allow the actor of a search to choose a secondary ordering of the result set among at least: compatibility score, deadline (ascending), budget (descending).
+
+#### 2.4.5 Reviews and reputation
+
+- **R24** — Upon a `Project` transitioning to `status = completed`, the system shall open a review window for both the `Client` owner and the `Freelancer` of the accepted `Proposal`.
+- **R25** — The system shall allow each of the two parties of a completed `Project` to submit at most one `Review` whose `target` is the counterpart, with a rating in `{1,2,3,4,5}` and an optional comment (DOM5, DOM6).
+- **R26** — The system shall refuse any attempt to modify or delete a `Review` after submission.
+- **R27** — On every submission of a `Review`, the system shall update the `reputation` of the target user according to DOM7 and shall make the updated value available to subsequent matching computations.
+
+#### 2.4.6 Notifications and dashboard
+
+- **R28** — The system shall deliver an in-app notification to each `Freelancer` in the ranking of a newly published `Project`.
+- **R29** — The system shall deliver an in-app notification to the `Client` owner of a `Project` whenever a new `Proposal` for that `Project` is submitted.
+- **R30** — Upon acceptance of a `Proposal`, the system shall deliver an "accepted" notification to the chosen `Freelancer` and a "rejected" notification to every other `Freelancer` whose pending `Proposal` for the same `Project` has been transitioned to `rejected`.
+- **R31** — Upon transition of a `Project` to `completed`, the system shall deliver a "review window opened" notification to both parties of the collaboration.
+- **R32** — The system shall provide each authenticated user with a personal dashboard showing the current state of the user's projects (for a `Client`) or applications (for a `Freelancer`), and the user's current reputation.
+
+#### 2.4.7 Traceability matrix
+![Domain model — Figure 1](images/traceability_matrix.png)
+
+---
+
+### 2.5 Non-functional aspects
+
+The following non-functional requirements (`NFR`) are organised by the ISO/IEC 25010 quality characteristics that are most relevant to this system. They are stated at a level of detail sufficient to guide the architectural decisions in Deliverable 2 and the testing strategy in Deliverable 3, without prescribing implementation-specific thresholds that would be premature at this stage of the analysis.
+
+#### 2.5.1 Performance
+
+- **NFR1** — The system shall respond to user interactions within a time that the user perceives as immediate, even under concurrent load from multiple active sessions.
+- **NFR2** — The computation and display of the candidate ranking following a project publication shall complete within a time compatible with normal use of the platform, without requiring the client to wait on a separate screen.
+- **NFR3** — The recomputation of a freelancer's suggested projects following a profile update shall be transparent to the user and shall not degrade the responsiveness of other parts of the interface.
+- **NFR4** — Notification delivery shall occur within a short interval from the triggering event, so that the receiving user can act on it without perceiving a significant delay.
+
+#### 2.5.2 Reliability and availability
+
+- **NFR5** — The system shall be available for use during normal working hours without unplanned interruptions; planned maintenance windows shall be scheduled outside peak usage periods and communicated in advance.
+- **NFR6** — Any lifecycle transition — in particular the atomic acceptance of a proposal and the cascading rejection of the remaining ones (R12) — shall either complete in full or leave the system in the state it was before the transition. Partial or inconsistent transitions are not acceptable.
+- **NFR7** — The persistent state of the system (profiles, projects, proposals, reviews, reputations) shall be protected against data loss through a regular backup strategy.
+
+#### 2.5.3 Usability
+
+- **NFR8** — A user who has never used the platform before shall be able to complete the registration and profile setup without external assistance, provided that the user has the necessary information at hand.
+- **NFR9** — Every action that changes the state of the system shall be preceded by an explicit confirmation step and followed by a feedback message that identifies the affected entity and its new state, so that the user always knows the outcome of their action.
+- **NFR10** — The interface shall use the terminology defined in Sec. 1.3.1 consistently, so that the concepts presented in the UI correspond directly to the entities described in this document.
+
+#### 2.5.4 Security and privacy
+
+- **NFR11** — User credentials shall be stored using an industry-standard password hashing scheme; plain-text storage of passwords is not acceptable.
+- **NFR12** — All communication between the client and the server shall be encrypted in transit; no functional flow shall be accessible over an unencrypted channel.
+- **NFR13** — The system shall handle personal data in accordance with applicable privacy regulations. Users shall be able to access their own data and to request its deletion.
+- **NFR14** — Each user shall be able to access and modify only their own data; the system shall prevent any authenticated session from reading or altering data that belongs to a different user.
+
+#### 2.5.5 Maintainability
+
+- **NFR15** — The matching procedure shall be implemented behind a well-defined interface so that the active strategy can be replaced or extended without modifying the modules responsible for the project lifecycle, proposal handling, notification delivery or reputation management. This is the testable form of G5.
+- **NFR16** — The system shall expose the metrics necessary to evaluate the quality of the active matching strategy (such as the rate at which suggested freelancers are contacted and the rate at which suggested projects result in an accepted proposal), so that the strategy can be assessed and compared to alternatives without changes to the application code.
+
+#### 2.5.6 Portability
+
+- **NFR17** — The web client shall function correctly on the mainstream desktop browsers in their recent versions, without requiring the installation of additional plugins or extensions.
+
+---
+
+### 2.6 Assumptions, dependencies and constraints
+
+This section collects the conditions under which the requirements of Sec. 2.4 and 2.5 are valid. They are split into three categories: *domain assumptions* (statements about the world that the system relies on but does not control), *dependencies* (external services or resources the system needs), *constraints* (limitations on the system or its development that the team has accepted or that have been imposed).
+
+#### 2.6.1 Domain assumptions
+
+The invariants `DOM1`–`DOM7` introduced in Sec. 2.2 are restated there as facts of the domain that the system has to enforce internally. The following additional assumptions are about the *world* and the system cannot enforce them — it relies on them being true.
+
+- **DOM8** — Users are honest in their self-declarations. The hourly rate, the mastery levels and the availability windows declared by a `Freelancer`, as well as the budget and the description declared by a `Client`, are taken at face value: the system has no means of independently verifying them.
+- **DOM9** — The execution and the financial settlement of the contracted work take place outside the system. The system has no observability over whether the work has been actually carried out, paid for, or to what level of quality; it relies entirely on the act of the `Client` marking the project as completed (WP6) and on the subsequent reviews (WP7).
+- **DOM10** — The two parties of a collaboration are honest in their reviews. The system has no oracle for the quality of the work other than the reviews themselves; the resulting `reputation` is therefore as reliable as the reviews that feed it.
+- **DOM11** — A user has a single platform identity. The system assumes one human (or one organisation) corresponds to at most one registered account. Detection of duplicate identities (e.g. multiple accounts of the same physical person) is not in scope.
+- **DOM12** — The controlled vocabulary of `Skill`s is sufficient for the description of the projects and the profiles in the target market segment, modulo the request-and-approval mechanism for new skills (R6).
+
+#### 2.6.2 Dependencies
+
+- **DEP1** — The system depends on the availability of a relational or document-oriented data store with transactional guarantees sufficient for the atomicity required by NFR6.
+- **DEP2** — The system depends on an outbound email service for the email-verification step at registration. Failure of the email service degrades the registration flow (the user cannot verify the email) but does not corrupt the rest of the system.
+- **DEP3** — The system runs on a server-side runtime and a web client that are themselves dependencies; the specific choice of stack is deferred to Deliverable 2.
+
+#### 2.6.3 Constraints
+
+- **C1** — The system is delivered as a web application. Native mobile clients (iOS, Android) are not in scope of this iteration.
+- **C2** — The system mediates the encounter between the two parties but does not act as an intermediary for payments or for the work itself. The platform records the agreed amount as part of the accepted proposal but neither collects nor disburses funds (consistent with DOM9).
+- **C3** — The system does not perform identity verification beyond the email-verification step at registration. Legal identity, fiscal residence, professional certification and similar checks are not in scope.
+- **C4** — Dispute resolution between the two parties of a collaboration is out of scope. The system records the resulting reviews (if any) but does not attempt to mediate the dispute.
+- **C5** — The compatibility-score weights and the size *N* of the ranking truncation are configuration parameters, not user-facing settings. The decision of when and how to retune them is taken by the administrator.
+- **C6** — The matching algorithm is intended to operate on the catalogue of profiles available on the platform; it does not consult external sources (e.g. professional networks, public CVs).
