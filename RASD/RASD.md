@@ -30,13 +30,13 @@ Software Engineering for Automation — A.Y. 2025-2026
     - [1.3.1 Definitions](#131-definitions)
     - [1.3.2 Acronyms and abbreviations](#132-acronyms-and-abbreviations)
   - [1.4 Document structure](#14-document-structure)
-- 2\. Overall description *(TBD)*
+- [2. Overall description](#2-overall-description)
   - [2.1 Scenarios](#21-scenarios)
   - [2.2 Domain model](#22-domain-model)
-  - 2.3 User characteristics
-  - 2.4 Product functions
-  - 2.5 Non-functional aspects
-  - 2.6 Assumptions, dependencies and constraints
+  - [2.3 User characteristics](#23-user-characteristics)
+  - [2.4 Product functions](#24-product-functions)
+  - [2.5 Non-functional aspects](#25-non-functional-aspects)
+  - [2.6 Assumptions, dependencies and constraints](#26-assumptions-dependencies-and-constraints)
 - 3\. Additional models *(TBD)*
   - 3.1 Requirements-level sequence diagrams
   - 3.2 Finite state machines
