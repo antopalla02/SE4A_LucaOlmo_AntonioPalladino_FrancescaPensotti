@@ -37,9 +37,9 @@ Software Engineering for Automation — A.Y. 2025-2026
   - [2.4 Product functions](#24-product-functions)
   - [2.5 Non-functional aspects](#25-non-functional-aspects)
   - [2.6 Assumptions, dependencies and constraints](#26-assumptions-dependencies-and-constraints)
-- 3\. Additional models *(TBD)*
-  - 3.1 Requirements-level sequence diagrams
-  - 3.2 Finite state machines
+- [3. Additional models](#3-additional-models)
+  - [3.1 Requirements-level sequence diagrams](#31-requirements-level-sequence-diagrams)
+  - [3.2 Finite state machines](#32-finite-state-machines)
 - 4\. References *(TBD)*
 
 
@@ -461,3 +461,43 @@ The invariants `DOM1`–`DOM7` introduced in Sec. 2.2 are restated there as fact
 - **C4** — Dispute resolution between the two parties of a collaboration is out of scope. The system records the resulting reviews (if any) but does not attempt to mediate the dispute.
 - **C5** — The compatibility-score weights and the size *N* of the ranking truncation are configuration parameters, not user-facing settings. The decision of when and how to retune them is taken by the administrator.
 - **C6** — The matching algorithm is intended to operate on the catalogue of profiles available on the platform; it does not consult external sources (e.g. professional networks, public CVs).
+
+---
+
+## 3. Additional models
+
+This section refines a small number of requirements with additional UML models, where a textual flow alone would leave room for ambiguity. The criterion for including a diagram in this section is simple: the diagram is included only when it adds information that is not already evident from the scenarios of Sec. 2.1 or the requirements of Sec. 2.4. Scenarios whose flow is fully captured by the textual description in Sec. 2.1 are not duplicated as sequence diagrams here.
+
+### 3.1 Requirements-level sequence diagrams
+
+Two sequence diagrams are included, corresponding to the two scenarios in which the interaction between the actors and the system involves multiple steps and side effects that are not immediately visible from the text of Sec. 2.1: the publication of a project with the cascading update of the suggested rankings (S2), and the acceptance of a proposal with the atomic transition and the cascade of rejection notifications (S4).
+
+The remaining scenarios — S1 (registration), S3 (single-actor proposal submission), S5 (review submission), S6 (manual search) — are not depicted as sequence diagrams: each of them consists of a single round-trip between an actor and the system, with no propagation of effects to third parties, and the textual description in Sec. 2.1 is already self-contained.
+
+#### 3.1.1 S2 — Project publication and matching
+
+Figure 2 shows the interaction triggered by a client publishing a project. The diagram highlights three aspects that are easy to miss in the textual flow: (i) the matching procedure is invoked through a separate `MatchingStrategy` collaborator, consistently with R20 and `G5`; (ii) the ranking is exposed to the client *and* propagates to every freelancer in the ranking, both as a notification (R28) and as an update of the personal "suggested projects" view (R16); (iii) these side effects are presented as the reaction of an observer to the `ProjectPublished` event, anticipating the *Observer* contract that will be formalised in Deliverable 2.
+
+![Project publication — Figure 1](images/seq_s2_publication.png)
+
+#### 3.1.2 S4 — Proposal acceptance and atomic transition
+
+Figure 3 shows the interaction triggered by a client accepting a proposal. The aspect that requires the diagram, and that the text of Sec. 2.1 can describe but not display, is the *atomic block* over three transitions: the chosen proposal moves to `accepted`, every other pending proposal of the same project moves to `rejected`, and the project itself moves to `inProgress`. The three transitions either commit together or do not happen at all (NFR6), and only after the commit are the notifications dispatched (R30). The diagram also makes visible the fact that, from this point on, the project refuses any further submission attempt (R13).
+
+![S4 sequence diagram — Figure 3](images/seq_s4_acceptance.png)
+
+### 3.2 Finite state machines
+
+Two domain entities have a lifecycle whose transitions are non-trivial and are referenced by multiple requirements: `Project` and `Proposal`. For each of them, the finite state machine below collects in a single picture all the transitions, the events that trigger them, the domain invariants they preserve, and the requirements that govern them. The state names match exactly the values of the corresponding `status` attribute introduced in Sec. 2.2.
+
+#### 3.2.1 Project lifecycle
+
+Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `inProgress`, `completed`) and only two non-trivial transitions: `open → inProgress` (triggered by the acceptance of a proposal, R11/R12) and `inProgress → completed` (triggered by the client marking the project as completed, R14). The state `open` admits self-transitions that correspond to updates of the project's own metadata, allowed while the project has not yet entered the in-progress phase. The state `completed` is terminal as far as the `Project` itself is concerned: the subsequent submission of reviews is governed by the lifecycle of `Review`, which is intentionally not included here as a separate FSM because it consists of a single state transition (a `Review` is either submitted or it does not exist, and once submitted it cannot be modified — see R26).
+
+![Project FSM — Figure 4](images/fsm_project.png)
+
+#### 3.2.2 Proposal lifecycle
+
+Figure 5 shows the lifecycle of a `Proposal`. There are three states (`pending`, `accepted`, `rejected`). The transition from `pending` to `accepted` corresponds to the explicit choice of the client owner of the parent project. The transition from `pending` to `rejected` has two sources: the explicit rejection of a proposal is not foreseen as a separate action in this iteration of the system (a client can only accept; the rejection of the other proposals is a cascading effect of the acceptance, R12). Both terminal states are final: once a proposal is accepted or rejected, it cannot be reverted (DOM2 forbids the existence of more than one accepted proposal per project, and a rejected proposal is not allowed to be re-evaluated).
+
+![Proposal FSM — Figure 5](images/fsm_proposal.png)
