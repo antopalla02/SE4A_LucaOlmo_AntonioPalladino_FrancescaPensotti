@@ -15,8 +15,6 @@ Software Engineering for Automation — A.Y. 2024-2025
 | | |
 |---|---|
 | **Authors** | Olmo Luca (10838404), Palladino Antonio (10778757), Pensotti Francesca (10777621) |
-| **Version** | 0.1 |
-| **Release date** | 2026-06-12 |
 | **Repository** | `https://github.com/<owner>/SE4A_LucaOlmo_AntonioPalladino_FrancescaPensotti` |
 
 ---
