@@ -8,7 +8,7 @@
 ---
 
 **Politecnico di Milano**
-Software Engineering for Automation — A.Y. 2024-2025
+Software Engineering for Automation — A.Y. 2025-2026
 
 </div>
 
