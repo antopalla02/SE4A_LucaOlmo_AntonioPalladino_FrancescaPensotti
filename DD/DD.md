@@ -16,7 +16,7 @@ Software Engineering for Automation — A.Y. 2024-2025
 |---|---|
 | **Authors** | Olmo Luca (10838404), Palladino Antonio (10778757), Pensotti Francesca (10777621) |
 | **Version** | 0.1 |
-| **Release date** | 2026-06-10 |
+| **Release date** | 2026-06-12 |
 | **Repository** | `https://github.com/<owner>/SE4A_LucaOlmo_AntonioPalladino_FrancescaPensotti` |
 
 ---
@@ -28,15 +28,15 @@ Software Engineering for Automation — A.Y. 2024-2025
   - [1.2 Definitions, Acronyms, Abbreviations](#12-definitions-acronyms-abbreviations)
   - [1.3 Revision history](#13-revision-history)
   - [1.4 Document structure](#14-document-structure)
-- 2\. Architectural Design *(TBD)*
-  - 2.1 Component view
+- [2. Architectural Design](#2-architectural-design)
+  - [2.1 Component view](#21-component-view)
   - 2.2 Class view
   - 2.3 Runtime view
   - 2.4 Selected architectural styles and patterns
-- 3\. User Interface Design *(TBD)*
-- 4\. Requirements Traceability *(TBD)*
-- 5\. Implementation, Integration and Test Plan *(TBD)*
-- 6\. References *(TBD)*
+- 3. User Interface Design *(TBD)*
+- 4. Requirements Traceability *(TBD)*
+- 5. Implementation, Integration and Test Plan *(TBD)*
+- 6. References *(TBD)*
 
 ---
 
@@ -105,7 +105,7 @@ The definitions of the domain terms (Client, Freelancer, Project, Proposal, Revi
 
 Figure 1 shows the components of the system and the dependencies between them. The architecture is layered: each component belongs to one of four layers — presentation, application, domain, infrastructure — and dependencies point inward, towards the domain. The domain layer has no outgoing dependency: it does not know how it is stored, how it is exposed over the network, or which concrete matching algorithm is active. This direction of dependencies is the single most important property of the architecture, because it is what makes the three replaceability requirements of the RASD (R20/NFR15 for the matching strategy, DEP1/Sec. 2.6.2 for the data store) achievable without touching the domain logic.
 
-![Component view — Figure 1](diagrams/component_view.png)
+![Component view — Figure 1](images/component_view.png)
 
 The components, their responsibilities and the interfaces they export are described below. Component names correspond one-to-one to the Python packages of the implementation (Sec. 5), so that the mapping between this document and the source tree is direct.
 
