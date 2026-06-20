@@ -28,9 +28,9 @@ Software Engineering for Automation — A.Y. 2025-2026
   - [1.4 Document structure](#14-document-structure)
 - [2. Architectural Design](#2-architectural-design)
   - [2.1 Component view](#21-component-view)
-  - 2.2 Class view
-  - 2.3 Runtime view
-  - 2.4 Selected architectural styles and patterns
+  - [2.2 Class view](#22-class-view)
+  - [2.3 Runtime view](#23-runtime-view)
+  - [2.4 Selected architectural styles and patterns](#24-selected-architectural-styles-and-patterns)
 - 3. User Interface Design *(TBD)*
 - 4. Requirements Traceability *(TBD)*
 - 5. Implementation, Integration and Test Plan *(TBD)*
