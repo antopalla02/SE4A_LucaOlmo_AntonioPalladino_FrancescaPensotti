@@ -173,3 +173,30 @@ Figure 3 shows the classes of the `matching` package, the concrete realisation o
 `RuleBasedStrategy` is the second implementation, used as the comparison baseline for the matching-quality assessment (NFR16): it ranks by sequential criteria the full skill coverage first, then budget feasibility, then decreasing reputation without any weighted combination.
 
 The active strategy is chosen by configuration at application startup and injected into the use cases that need it (S2 publication, S6 search ordering, profile-update recomputations). No component other than the startup wiring knows which concrete class is active; replacing or adding a strategy therefore satisfies NFR15 by construction.
+
+### 2.3 Runtime view
+
+This section shows how the components of Sec. 2.1 collaborate at runtime to accomplish the main scenarios of the system. The same selection criterion of RASD Sec. 3.1 applies, now at the design level: a runtime diagram is included only for the flows in which the *internal* collaboration between components carries design decisions that the component view alone cannot show. These are, again, S2 (project publication, where the matching strategy and the event propagation enter the picture) and S4 (proposal acceptance, where the transactional boundary is the decision). The remaining scenarios follow the same uniform pattern — `api` → use case → repository (→ event bus) — with no variation worth a dedicated diagram.
+
+Both diagrams use the components of Sec. 2.1 as lifelines, with the application layer depending only on the three interfaces (`IRepository`, `IMatchingStrategy`, `IEventBus`); the concrete implementations behind them are interchangeable, as discussed in Sec. 2.4.
+
+#### 2.3.1 S2 — Project publication
+
+Figure 4 shows the runtime interaction for the publication of a project (RASD scenario S2, requirements R7, R8, R15, R16, R18, R19, R28).
+
+![Runtime view S2 — Figure 4](images/runtime_s2_publication.png)
+
+Three design decisions are visible in the diagram. First, **validation happens in the domain**: `Project.create(...)` enforces R7 (mandatory fields, deadline in the future, budget ≥ 0) and sets the initial state per R8; the use case never constructs a `Project` in an invalid state. Second, **the ranking computation goes through `IMatchingStrategy`**: the use case does not know whether the active strategy is the weighted-score or the rule-based one, which is the operational meaning of R20. Third, **side effects are observer-driven**: the use case publishes a single `ProjectPublished` event and terminates; the notification fan-out (R28) and the refresh of the freelancer-side suggested view (R16) happen in handlers subscribed to that event. Adding a further side effect to project publication — e.g. an audit log — would mean registering one more handler, with no change to `publish_project`.
+
+The transaction in this flow covers only the persistence of the new project. The ranking computation runs after the commit: a failure in the matching must not roll back a correctly published project; in the worst case the ranking is recomputed on the next profile-update event, and the project remains visible in the catalogue for manual applications (consistently with the "empty ranking" alternative flow of RASD S2).
+
+#### 2.3.2 S4 — Proposal acceptance
+
+Figure 5 shows the runtime interaction for the acceptance of a proposal (RASD scenario S4, requirements R11, R12, R13, R30, NFR6).
+
+![Runtime view S4 — Figure 5](images/runtime_s4_acceptance.png)
+
+This is the flow where the transactional design decision lives, and the diagram makes its boundaries explicit. The atomic block of R12 starts when the use case loads the project together with its proposals, and ends with the single `projects.save(project)` commit. Inside the block, the entire decision logic is delegated to the domain: `Project.accept_proposal(proposal_id)` performs the FSM checks of RASD Sec. 3.2.1–3.2.2 and applies the three transitions (chosen proposal → `ACCEPTED`, every other pending proposal → `REJECTED`, project → `IN_PROGRESS`) on the in-memory aggregate. The repository then persists the aggregate in one commit: either all three transitions become visible, or none does (NFR6). Concurrent acceptance attempts are serialised at this commit point — the second transaction finds the project no longer `OPEN` and the domain check fails, which is the design-level realisation of the "concurrent acceptance" exception flow of RASD S4.
+
+The `ProposalAccepted` event is published **after** the commit, never inside the transaction. This ordering rules out the failure mode in which freelancers receive acceptance or rejection notifications (R30) for a transition that was subsequently rolled back. The trade-off is the opposite, narrower failure mode — a crash between commit and publish would lose the notifications — which is acceptable for in-app notifications that the user can in any case derive from the dashboard state (R32).
+
