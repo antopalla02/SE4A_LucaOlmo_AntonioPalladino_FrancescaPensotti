@@ -200,3 +200,38 @@ This is the flow where the transactional design decision lives, and the diagram 
 
 The `ProposalAccepted` event is published **after** the commit, never inside the transaction. This ordering rules out the failure mode in which freelancers receive acceptance or rejection notifications (R30) for a transition that was subsequently rolled back. The trade-off is the opposite, narrower failure mode — a crash between commit and publish would lose the notifications — which is acceptable for in-app notifications that the user can in any case derive from the dashboard state (R32).
 
+### 2.4 Selected architectural styles and patterns
+
+This section names the architectural style and the design patterns adopted, and for each of them explains *why* it was selected — i.e. which requirement or quality of the RASD it serves — and *how* it is realised in the components of Sec. 2.1–2.3. The three patterns below are the ones anticipated in the project proposal; the layered style is the frame that holds them together.
+
+#### 2.4.1 Layered architecture (style)
+
+**Which.** The system is organised in four layers — presentation, application, domain, infrastructure — with dependencies pointing inward towards the domain, as shown in the component view (Sec. 2.1) and enforced by the dependency rules of Sec. 2.1.7. The domain layer depends on nothing; the infrastructure implements interfaces declared for the inner layers' benefit.
+
+**Why.** Two reasons, both traceable to the RASD. First, the replaceability requirements: R20/NFR15 (matching strategy) and the data-store abstraction of Sec. 2.6.2/DEP1 both demand that a concrete mechanism can be swapped without touching the business logic, which is achievable only if the business logic does not reference concrete mechanisms in the first place. Second, testability: NFR-level conformance (in particular the invariants DOM1–DOM7 and the FSM transitions) must be verifiable by the test suite without a database or a web server, which requires a domain layer importable in isolation.
+
+**How.** Each layer is one or more Python packages (`api`, `application`, `domain` + `matching` + `events`, `repositories`). The inward dependency rule is realised through three interfaces owned by the inner layers and implemented by the outer ones: `IRepository`, `IMatchingStrategy`, `IEventBus`. The concrete implementations are wired at application startup (composition root in `main.py`) and injected into the use cases; no module below the startup wiring imports a concrete implementation.
+
+#### 2.4.2 Strategy — replaceable matching algorithm
+
+**Which.** The *Strategy* pattern applied to the matching procedure: the interface `MatchingStrategy` (Sec. 2.2.2) with two interchangeable implementations, `WeightedScoreStrategy` (default, the score model S(P,F) of R18 with the hard filters of R19) and `RuleBasedStrategy` (the sequential-criteria baseline).
+
+**Why.** This is the direct realisation of goal G5 and of its requirement form R20/NFR15: the matching algorithm is the part of the system most likely to evolve — the project proposal itself plans a quality comparison between the two strategies (NFR16) — and the rest of the system must be insulated from that evolution. Without the pattern, every experiment on the ranking logic would risk regressions in project lifecycle, notifications and reviews.
+
+**How.** The use cases that need a ranking (`publish_project`, `manual_search`, the profile-update handlers) receive a `MatchingStrategy` instance through their constructor; the active implementation is chosen by a configuration key read at startup. The two ranking directions (G1: freelancers for a project; G2: projects for a freelancer) are two operations of the same interface, so a strategy is always coherent across both directions. Adding a third strategy consists of one new class implementing the interface plus one new value for the configuration key, no other file changes.
+
+#### 2.4.3 Observer — decoupled reaction to lifecycle events
+
+**Which.** The *Observer* pattern, realised as an in-process event bus (`IEventBus`, Sec. 2.1.5): use cases publish typed domain events — `ProjectPublished`, `ProposalReceived`, `ProposalAccepted`, `CollaborationCompleted`, `ProfileUpdated` — and handlers registered at startup react to them.
+
+**Why.** The lifecycle transitions of the system have one-to-many side effects: a single acceptance (S4) must close the other proposals' lifecycle, notify the chosen freelancer and notify every rejected one (R30); a single publication (S2) must notify the ranked freelancers (R28) and refresh their suggested views (R16); a profile update must recompute rankings on both sides (R16, R17). Hard-wiring these effects into the use cases would make every new side effect a modification of tested code; the Observer inverts this, making new effects additive. The pattern is also what keeps the runtime view of Sec. 2.3 honest: the publisher terminates after `publish(event)` and genuinely does not know its subscribers.
+
+**How.** The event bus is a registry mapping event types to lists of handler callables, populated in the composition root. Events are plain immutable dataclasses produced *by the domain entities* as return values of their transition methods (Sec. 2.2.1) and published *by the use cases* strictly after the transaction commit (Sec. 2.3.2), which fixes the ordering guarantee discussed there. Handlers live in the `events` package and use the same repository interfaces as the use cases.
+
+#### 2.4.4 Repository — data access decoupled from domain logic
+
+**Which.** The *Repository* pattern: one repository interface per aggregate (users, projects, proposals, reviews, notifications, skills) declared next to the domain, with two implementations — SQLAlchemy/SQLite for runtime, in-memory dictionaries for the test suite.
+
+**Why.** Anticipated in RASD Sec. 2.6.2/DEP1 for exactly the reason it is adopted here: the correctness of the matching and of the lifecycle logic must be verifiable against controlled, reproducible data sets. An in-memory implementation makes every domain and application test run in milliseconds with no setup; the SQLite implementation carries the transactional guarantees that the atomic block of R12 requires (NFR6). The pattern also implements constraint C2 of the layered style: the repository layer is the only code allowed to touch the database, so a future migration from SQLite to PostgreSQL is confined to one package and one connection string.
+
+**How.** Each repository interface exposes aggregate-oriented operations (`get`, `get_with_proposals`, `save`, `list_open`, …) rather than generic CRUD on rows: the unit of loading and saving is the aggregate that the domain methods operate on — e.g. `projects.get_with_proposals()` returns a `Project` together with its `Proposal`s precisely because `Project.accept_proposal()` needs to transition them together inside one atomic block (Sec. 2.3.2). The SQLAlchemy implementation maps the domain entities to tables; the mapping is kept in the `repositories` package so that the `domain` package remains free of ORM imports.
