@@ -143,3 +143,33 @@ The dependency rules, visible as arrow directions in Figure 1, are summarised be
 | `matching` | `domain` | `application`, `api`, `repositories` |
 | `events` | `domain` (event payloads) | `api` |
 | `repositories` | `domain` | `application`, `api`, `matching` |
+
+### 2.2 Class view
+
+This section refines two of the components introduced in Sec. 2.1 down to the class level: the Domain Model and the Matching component. These two are the ones whose internal structure carries actual design decisions; the remaining components (API Gateway, Use Cases, Event Bus, Repositories) are intentionally thin — their structure is one module per responsibility, fully described by Sec. 2.1 and by the runtime view of Sec. 2.3, and a class diagram would add no information.
+
+#### 2.2.1 Domain Model
+
+Figure 2 shows the classes of the `domain` package. The diagram is the implementation-level refinement of the conceptual domain model of RASD Sec. 2.2: the entities, associations and multiplicities are unchanged, and the refinement consists of (i) concrete attribute types, (ii) the behavioural methods that each entity exposes, and (iii) the explicit enumerations backing the `status` attributes.
+
+![Class view: domain — Figure 2](images/class_domain.png)
+
+The key design decision in this diagram is that **state transitions are methods of the entities themselves**, not procedures of the application layer. `Project.accept_proposal()` and `Project.mark_completed()` implement the FSM of RASD Sec. 3.2.1; `Proposal.accept()` and `Proposal.reject()` implement the FSM of RASD Sec. 3.2.2. Each method checks the current state and raises a `DomainError` when the requested transition is not legal. For instance, `accept_proposal()` on a project whose status is not `OPEN` fails before any side effect occurs. This placement guarantees that the invariants DOM1–DOM7 cannot be bypassed: there is no code path that mutates a `status` attribute directly, so any caller, present or future, goes through the validating methods.
+
+Transition methods return the list of `DomainEvent`s that the transition implies (e.g. `accept_proposal()` returns a `ProposalAccepted` event carrying the identifiers of the accepted and rejected proposals). The entity *decides* which events occurred; the application layer *publishes* them on the event bus after the transaction commits. This split keeps the domain free of any dependency on the event infrastructure while still making the entity the single source of truth for what happened.
+
+`User.reputation` is stored as a plain attribute and recomputed by `update_reputation(reviews)` upon submission of a new review (R27, DOM7), rather than being recalculated on every read: the trade-off favours read performance (reputation is read by every matching computation) at the negligible cost of one extra write per review.
+
+#### 2.2.2 Matching
+
+Figure 3 shows the classes of the `matching` package, the concrete realisation of the *Strategy* pattern required by R20/NFR15.
+
+![Class view: matching — Figure 3](images/class_matching.png)
+
+`MatchingStrategy` is the interface the application layer depends on. It exposes the two ranking directions of G1/G2 as separate operations — `rank_freelancers(project, candidates)` and `rank_projects(freelancer, open_projects)` — both returning ordered lists of scored results, truncated to the configured length *N* by the caller.
+
+`WeightedScoreStrategy` is the default implementation and realises the score S(P,F) of R18. The four sub-scores (`s_skills`, `s_budget`, `s_reputation`, `s_availability`) are private methods, each normalised in [0,1]; `compute_score` combines them with the weights held by the `MatchingWeights` value object, whose `validate()` enforces that the weights sum to one. Hard filters (R19) are applied before any score is computed, so excluded candidates never enter the scoring loop. Keeping the weights in a separate value object (rather than as constructor arguments) gives the administrator-facing configuration of RASD C5 a single, validated home.
+
+`RuleBasedStrategy` is the second implementation, used as the comparison baseline for the matching-quality assessment (NFR16): it ranks by sequential criteria the full skill coverage first, then budget feasibility, then decreasing reputation without any weighted combination.
+
+The active strategy is chosen by configuration at application startup and injected into the use cases that need it (S2 publication, S6 search ordering, profile-update recomputations). No component other than the startup wiring knows which concrete class is active; replacing or adding a strategy therefore satisfies NFR15 by construction.
