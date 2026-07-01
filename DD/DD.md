@@ -31,9 +31,9 @@ Software Engineering for Automation — A.Y. 2025-2026
   - [2.2 Class view](#22-class-view)
   - [2.3 Runtime view](#23-runtime-view)
   - [2.4 Selected architectural styles and patterns](#24-selected-architectural-styles-and-patterns)
-- 3. User Interface Design *(TBD)*
-- 4. Requirements Traceability *(TBD)*
-- 5. Implementation, Integration and Test Plan *(TBD)*
+- [3. User Interface Design](#3-user-interface-design)
+- [4. Requirements Traceability](#4-requirements-traceability)
+- [5. Implementation, Integration and Test Plan](#5-implementation-integration-and-test-plan)
 - 6. References *(TBD)*
 
 ---
@@ -235,3 +235,129 @@ This section names the architectural style and the design patterns adopted, and 
 **Why.** Anticipated in RASD Sec. 2.6.2/DEP1 for exactly the reason it is adopted here: the correctness of the matching and of the lifecycle logic must be verifiable against controlled, reproducible data sets. An in-memory implementation makes every domain and application test run in milliseconds with no setup; the SQLite implementation carries the transactional guarantees that the atomic block of R12 requires (NFR6). The pattern also implements constraint C2 of the layered style: the repository layer is the only code allowed to touch the database, so a future migration from SQLite to PostgreSQL is confined to one package and one connection string.
 
 **How.** Each repository interface exposes aggregate-oriented operations (`get`, `get_with_proposals`, `save`, `list_open`, …) rather than generic CRUD on rows: the unit of loading and saving is the aggregate that the domain methods operate on — e.g. `projects.get_with_proposals()` returns a `Project` together with its `Proposal`s precisely because `Project.accept_proposal()` needs to transition them together inside one atomic block (Sec. 2.3.2). The SQLAlchemy implementation maps the domain entities to tables; the mapping is kept in the `repositories` package so that the `domain` package remains free of ORM imports.
+## 3. User Interface Design
+
+### 3.1 Approach: API-first delivery
+
+The system is delivered API-first, consistently with constraint C1 of the RASD (web application, no native clients) and with the prototype scope of Deliverable 3. The user-facing surface of this iteration is the REST API itself, operated through the **OpenAPI (Swagger) console** that FastAPI generates automatically from the endpoint definitions and serves at the `/docs` path.
+
+This choice is a deliberate allocation of effort, not an omission. The interesting engineering content of FreelanceMatch — the matching strategies, the lifecycle invariants, the event-driven side effects — lives entirely behind the API boundary; a custom graphical frontend would exercise none of it and would consume a significant share of the implementation budget. The OpenAPI console, by contrast, costs zero implementation effort and provides everything the demonstration and the evaluation need: every endpoint is listed with its request/response schemas, can be invoked interactively from the browser, and displays the actual responses of the running system. A custom frontend remains a natural extension and would interact with the very same API, with no server-side change.
+
+### 3.2 Structure of the interface
+
+The console groups the endpoints by tag; tags correspond one-to-one to the requirement clusters of RASD Sec. 2.4, so that the interface itself mirrors the structure of the requirements:
+
+| Tag | Endpoints (main) | Requirements cluster |
+|---|---|---|
+| **accounts** | `POST /users` (register), `POST /login`, `GET/PUT /users/me` (profile), `GET /skills`, `POST /skills/requests` | R1–R6 |
+| **projects** | `POST /projects`, `GET /projects/{id}`, `POST /projects/{id}/complete` | R7, R8, R14 |
+| **proposals** | `POST /projects/{id}/proposals`, `POST /projects/{id}/proposals/{pid}/accept` | R9–R13 |
+| **matching** | `GET /projects/{id}/ranking`, `GET /users/me/suggested-projects` | R15–R20 |
+| **search** | `GET /search/freelancers`, `GET /search/projects` | R21–R23 |
+| **reviews** | `POST /projects/{id}/reviews` | R24–R27 |
+| **notifications** | `GET /users/me/notifications`, `GET /users/me/dashboard` | R28–R32 |
+| **metrics** | `GET /metrics/matching` | NFR16 |
+
+The table lists the main endpoints per cluster; the complete and authoritative list is the auto-generated OpenAPI console.
+### 3.3 Interaction conventions
+
+The conventions below realise, at the API level, the usability requirements stated for the interface in the RASD:
+
+- **Explicit outcome feedback (NFR9).** Every state-changing endpoint returns the affected entity with its new state in the response body (e.g. accepting a proposal returns the project with `status = IN_PROGRESS` and the proposal with `status = ACCEPTED`), so the caller always observes the outcome of the action.
+- **Errors as structured responses.** Domain errors (FSM violations, invariant violations DOM1–DOM7, validation failures) are translated by the API Gateway into HTTP `409 Conflict` or `422 Unprocessable Entity` with a machine-readable body `{ "error": <code>, "detail": <message> }`; the error codes reuse the invariant identifiers (e.g. `DOM1_DUPLICATE_PROPOSAL`), keeping the vocabulary of the documents and of the running system aligned (NFR10).
+- **Identity.** For the prototype, the authenticated user is conveyed by a session token obtained from `POST /login`; endpoints under `/users/me/...` resolve the identity from the token (NFR14).
+
+### 3.4 Walkthrough of the demonstration flow
+
+The demonstration of the system follows the scenario chain S1→S5 of the RASD directly on the console: register a client and a freelancer (S1), publish a project and inspect the returned ranking (S2), submit a proposal as the freelancer (S3), accept it as the client and observe the cascading state changes (S4), complete the project and exchange reviews, observing the reputation update (S5). A seed script (Sec. 5) pre-populates the database with a realistic catalogue of skills and freelancers so that the rankings computed during the demonstration are meaningful.
+## 4. Requirements Traceability
+
+This section maps the functional requirements R1–R32 of the RASD onto the design elements introduced in Section 2, extending the traceability matrix of RASD Sec. 2.4.7 with the design columns. For each requirement, the matrix indicates the use case (application module) that orchestrates it and the design element — component, class or method — that realises its core logic. The non-functional requirements with a direct design counterpart are traced in the closing paragraph.
+
+| Req. | Use case (application) | Design element (component — class/method) |
+|------|------------------------|--------------------------------------------|
+| R1   | `register_user` | `domain — User` subclass creation; `api — POST /users` |
+| R2   | `register_user` | `repositories — UserRepository.exists_by_email()` |
+| R3   | `register_user` / profile update | `domain — Client` profile fields |
+| R4   | `register_user` / profile update | `domain — Freelancer.declare_competence()`, `add_availability()` |
+| R5   | profile update | `repositories — UserRepository.save()`; `events — ProfileUpdated` |
+| R6   | `register_user` | `domain — Skill` catalogue; `repositories — SkillRepository` |
+| R7   | `publish_project` | `domain — Project.create()` validation |
+| R8   | `publish_project` | `domain — Project.create()` → `status = OPEN` |
+| R9   | `submit_proposal` | `domain — Project.can_receive_proposals()` |
+| R10  | `submit_proposal` | `repositories — ProposalRepository` uniqueness check (DOM1) |
+| R11  | `accept_proposal` | `domain — Project.accept_proposal()` precondition |
+| R12  | `accept_proposal` | `domain — Project.accept_proposal()` inside the transactional block (Sec. 2.3.2) |
+| R13  | `submit_proposal` | `domain — Project.can_receive_proposals()` (status ≠ OPEN → refuse) |
+| R14  | `complete_and_review` | `domain — Project.mark_completed()` |
+| R15  | `publish_project` | `matching — MatchingStrategy.rank_freelancers()` |
+| R16  | events handler | `events — on_profile_updated` → `rank_projects()` |
+| R17  | events handler | `events — on_profile_updated` → recompute open-project rankings |
+| R18  | — | `matching — WeightedScoreStrategy.compute_score()` + sub-score methods |
+| R19  | — | `matching — WeightedScoreStrategy` hard-filter pre-pass |
+| R20  | all ranking call sites | `matching — MatchingStrategy` interface + startup wiring (Sec. 2.4.2) |
+| R21  | `manual_search` | `repositories — UserRepository.search()`; `api — GET /search/freelancers` |
+| R22  | `manual_search` | `repositories — ProjectRepository.search()`; `api — GET /search/projects` |
+| R23  | `manual_search` | ordering parameter resolved in `manual_search` |
+| R24  | `complete_and_review` | `events — on_collaboration_completed` opens review window |
+| R25  | `complete_and_review` | `domain — Review` creation rules (DOM5, DOM6) |
+| R26  | `complete_and_review` | `domain — Review` immutability (no update method exists) |
+| R27  | `complete_and_review` | `domain — User.update_reputation()`; `events — on_review_submitted` |
+| R28  | events handler | `events — on_project_published` → notifications |
+| R29  | events handler | `events — on_proposal_received` → notification to owner |
+| R30  | events handler | `events — on_proposal_accepted` → accepted/rejected notifications |
+| R31  | events handler | `events — on_collaboration_completed` → review-window notifications |
+| R32  | dashboard query | `api — GET /users/me/dashboard`; `repositories` read queries |
+
+Beyond the functional requirements, the design directly realises the following non-functional ones. **NFR6** (atomic transitions) is realised by the transactional boundary drawn in the `accept_proposal` use case around the aggregate commit (Sec. 2.3.2). **NFR15** (strategy replaceability) is realised by the `MatchingStrategy` interface and the startup wiring (Sec. 2.4.2) and verified mechanically by the swap test of Sec. 5. **NFR16** (matching quality metrics) is realised by the `RuleBasedStrategy` baseline plus the event handlers, which record ranking exposures and proposal outcomes as they react to the lifecycle events. **NFR11–NFR14** (security) are confined to the `api` component (password hashing at registration, session resolution, per-user data scoping in the `/users/me/...` endpoints), consistently with the layering: no security concern leaks below the presentation layer.
+
+The remaining mappings of requirements to goals, scenarios, shared phenomena and domain invariants are unchanged from RASD Sec. 2.4.7 and are not duplicated here.
+## 5. Implementation, Integration and Test Plan
+
+This section defines the order in which the components of Sec. 2.1 will be implemented, the order in which they will be integrated, and the strategy for testing each increment. The plan follows a bottom-up order along the dependency direction of the layered architecture: components are implemented starting from the ones that depend on nothing, so that every increment is testable the moment it is written, without stubs for lower layers.
+
+### 5.1 Implementation order
+
+The implementation proceeds in five increments. Each increment ends with a working, tested state of the repository — never with code that compiles but cannot be exercised.
+
+**Increment 1 — Domain (`domain`).**
+The entities, enumerations and transition methods of Sec. 2.2.1, with the invariants DOM1–DOM7 enforced inside the entities. This increment has no dependency and is implemented first precisely because everything else depends on it. Includes the `DomainEvent` dataclasses returned by the transition methods.
+*Exit criterion:* the unit-test suite over the domain passes (Sec. 5.3, T1–T2); the FSMs of RASD Sec. 3.2 are fully covered, legal and illegal transitions alike.
+
+**Increment 2 — Matching (`matching`) and in-memory repositories.**
+The `MatchingStrategy` interface with both implementations (Sec. 2.2.2), plus the in-memory implementation of the repository interfaces. The in-memory repositories are implemented *before* the SQL ones because they unblock the testing of everything above the domain at negligible cost.
+*Exit criterion:* T3–T4 pass; the two strategies produce correct and distinct rankings on a controlled catalogue.
+
+**Increment 3 — Application layer (`application`) and event bus (`events`).**
+The six use cases in the order of their scenario dependencies: `register_user` (S1), `publish_project` (S2), `submit_proposal` (S3), `accept_proposal` (S4), `complete_and_review` (S5), `manual_search` (S6, lowest priority — declared nice-to-have and cut first if the schedule demands it). The event bus and the handlers are implemented together with `publish_project`, which is the first use case that needs them.
+*Exit criterion:* T5–T6 pass; the full chain S1→S5 runs as a plain Python script against the in-memory repositories.
+
+**Increment 4 — Persistence (`repositories`/SQLAlchemy) and composition root.**
+The SQLite implementation of the repository interfaces, the ORM mapping, and the startup wiring (`main.py`) that selects the active matching strategy and registers the event handlers.
+*Exit criterion:* T7 passes; the same S1→S5 script of increment 3 runs unmodified against SQLite — the strongest possible evidence that the Repository abstraction holds.
+
+**Increment 5 — API (`api`), seed data, packaging.**
+The REST endpoints of Sec. 3.2 (thin translation to use cases), the error mapping of Sec. 3.3, the seed script, the installation instructions. This is last because it adds no logic: every behaviour it exposes already exists and is already tested.
+*Exit criterion:* T8 passes; the demonstration walkthrough of Sec. 3.4 can be executed end-to-end on the Swagger console after a fresh clone-and-install.
+
+### 5.2 Integration order
+
+Integration follows the increments: each increment integrates with the already-tested stack below it, so there is no "big-bang" integration phase. The two integration points that deserve explicit attention are:
+
+1. **Application ↔ Persistence (increment 4).** The switch from in-memory to SQLite repositories is the moment when the transactional semantics of NFR6 becomes real. The integration test T7 exercises the atomic block of `accept_proposal` against SQLite specifically, including the concurrent-acceptance race (two acceptances of different proposals on the same project: exactly one must succeed).
+2. **API ↔ Application (increment 5).** Verified by end-to-end tests that drive the HTTP interface (FastAPI's test client) through the S1→S5 chain and assert on the HTTP-level contract: status codes, error bodies with DOM-coded errors, state visible in responses (NFR9).
+
+### 5.3 Test plan
+
+Testing is organised in three levels — unit (domain, matching), integration (use cases against both repository implementations), end-to-end (HTTP) — with the suite below as the committed minimum. Tests are written together with the increment they verify, not deferred to the end.
+
+| Id | Level | What it verifies | Traces to |
+|----|-------|------------------|-----------|
+| T1 | unit | Every invariant DOM1–DOM7: one test per invariant attempting the violation and expecting `DomainError` | RASD Sec. 2.2 |
+| T2 | unit | FSM transition coverage for `Project` and `Proposal`: all legal transitions succeed, all illegal ones fail | RASD Sec. 3.2; R8–R14 |
+| T3 | unit | `WeightedScoreStrategy`: sub-scores normalised in [0,1], weights validated, hard filters exclude before scoring, known catalogue → known ranking | R18, R19 |
+| T4 | unit | Strategy swap: identical input through both strategies yields valid but distinct rankings; active strategy switchable by configuration alone | R20, NFR15, G5 |
+| T5 | integration | Use-case chain S1→S5 on in-memory repositories: full lifecycle with assertions on intermediate states and emitted events | S1–S5; R1–R31 |
+| T6 | integration | Observer effects: `ProjectPublished` produces notifications + suggested-view refresh; `ProposalAccepted` produces accepted/rejected notifications; handlers receive events only after commit | R16, R28–R31 |
+| T7 | integration | Atomic acceptance on SQLite: cascade correctness and concurrent-acceptance race (exactly one winner) | R12, DOM2, DOM3, NFR6 |
+| T8 | end-to-end | HTTP walkthrough of Sec. 3.4 via test client: status codes, DOM-coded error bodies, per-user data scoping | NFR9, NFR10, NFR14 |
