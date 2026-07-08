@@ -299,7 +299,7 @@ The flows above span every shared phenomenon listed in Sec. 1.2.2 at least once:
 
 This section formalises the entities of the application domain and the relationships between them. The model is intentionally kept at the conceptual level: it captures *what* the system has to talk about, not *how* it stores it. Figure 1 shows the resulting UML class diagram. The PlantUML source is in `diagrams/domain_model.puml`.
 
-![Domain model — Figure 1](diagrams/domain_model.png)
+![Domain model — Figure 1](images/domain_model.png)
 
 **Actors and roles.** Every person registered on the platform is a `User`. The two roles a user can have, *Client* and *Freelancer*, are modelled as subclasses: a `User` is exactly one of the two and the role is fixed at registration time. The attributes that are common to both (e.g. email, registration date, reputation) live in `User`; the role-specific attributes — business-related fields for `Client`, hourly rate and portfolio for `Freelancer` — live in the respective subclasses.
 
