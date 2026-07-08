@@ -356,7 +356,7 @@ This section enumerates the functional requirements of the system. Requirements 
 - **R7** — The system shall persist a profile change before returning control to the user.
 - **R8** — The system shall maintain a controlled vocabulary of `Skill`s.
 - **R9** — The system shall reject any `Competence` referring to a `Skill` not present in the controlled vocabulary.
-- **R10** — The system shall allow a user to request the addition of a new `Skill`, and shall keep the request pending until an administrator approves it.
+- **R10** — The system shall allow a user to request the addition of a new `Skill` to the controlled vocabulary, subject to administrator approval.
 
 #### 2.4.2 Project lifecycle
 
