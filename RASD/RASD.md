@@ -493,7 +493,7 @@ Figure 2 shows the interaction triggered by a client publishing a project. The d
 
 Figure 3 shows the interaction triggered by a client accepting a proposal. The aspect that requires the diagram, and that the text of Sec. 2.1 can describe but not display, is the *atomic block* over three transitions: the chosen proposal moves to `accepted`, every other pending proposal of the same project moves to `rejected`, and the project itself moves to `inProgress`. The three transitions either commit together or do not happen at all (R16), and only after the commit are the notifications dispatched (R37). The diagram also makes visible the fact that, from this point on, the project refuses any further submission attempt (R17).
 
-![S4 sequence diagram — Figure 3](diagrams/seq_s4_acceptance.png)
+![S4 sequence diagram — Figure 3](images/seq_s4_acceptance.png)
 
 ### 3.2 Finite state machines
 
