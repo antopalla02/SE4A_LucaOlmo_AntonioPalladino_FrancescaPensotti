@@ -503,13 +503,13 @@ Two domain entities have a lifecycle whose transitions are non-trivial and are r
 
 Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `inProgress`, `completed`) and only two non-trivial transitions: `open → inProgress` (triggered by the acceptance of a proposal, R15/R16) and `inProgress → completed` (triggered by the client marking the project as completed, R18). The state `open` admits a self-transition corresponding to updates of the project's own metadata (R46), allowed while the project has not yet entered the in-progress phase. The state `completed` is terminal as far as the `Project` itself is concerned: the subsequent submission of reviews is governed by the lifecycle of `Review`, which is intentionally not included here as a separate FSM because it consists of a single state transition (a `Review` is either submitted or it does not exist, and once submitted it cannot be modified — see R32).
 
-![Project FSM — Figure 4](diagrams/fsm_project.png)
+![Project FSM — Figure 4](images/fsm_project.png)
 
 #### 3.2.2 Proposal lifecycle
 
 Figure 5 shows the lifecycle of a `Proposal`. There are three states (`pending`, `accepted`, `rejected`). The transition from `pending` to `accepted` corresponds to the explicit choice of the client owner of the parent project. The transition from `pending` to `rejected` has two sources: the explicit rejection of a proposal is not foreseen as a separate action in this iteration of the system (a client can only accept; the rejection of the other proposals is a cascading effect of the acceptance, R16). Both terminal states are final: once a proposal is accepted or rejected, it cannot be reverted (R15 admits at most one accepted proposal per project, and a rejected proposal is not allowed to be re-evaluated).
 
-![Proposal FSM — Figure 5](diagrams/fsm_proposal.png)
+![Proposal FSM — Figure 5](images/fsm_proposal.png)
 
 ---
 
