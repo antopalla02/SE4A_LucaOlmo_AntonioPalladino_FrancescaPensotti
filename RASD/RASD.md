@@ -414,7 +414,7 @@ This section enumerates the functional requirements of the system. Requirements 
 - **R46** — The system shall allow the `Client` owner of an `open` `Project` to update its title and description.
 
 #### 2.4.8 Traceability matrix
-![Traceability matrix — Figure 1](diagrams/traceability_matrix.png)
+![Traceability matrix — Figure 1](images/traceability_matrix.png)
 
 ---
 
