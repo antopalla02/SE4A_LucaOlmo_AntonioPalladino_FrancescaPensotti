@@ -487,7 +487,7 @@ The remaining scenarios — S1 (registration), S3 (single-actor proposal submiss
 
 Figure 2 shows the interaction triggered by a client publishing a project. The diagram highlights three aspects that are easy to miss in the textual flow: (i) the matching procedure is invoked through a separate `MatchingStrategy` collaborator, consistently with R19 and R26; (ii) the ranking is exposed to the client *and* propagates to every freelancer in the ranking, both as a notification (R35) and as an update of the personal "suggested projects" view (R22); (iii) these side effects are presented as the reaction of an observer to the `ProjectPublished` event, anticipating the *Observer* contract that will be formalised in Deliverable 2.
 
-![Project publication — Figure 1](diagrams/seq_s2_publication.png)
+![Project publication — Figure 1](images/seq_s2_publication.png)
 
 #### 3.1.2 S4 — Proposal acceptance and atomic transition
 
