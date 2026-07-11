@@ -409,9 +409,8 @@ This section enumerates the functional requirements of the system. Requirements 
 - **R41** — Every request that successfully changes the system's state shall receive a response containing the identifier of the affected entity and its resulting state.
 - **R42** — The system shall refuse any authenticated request targeting data belonging to a user other than the requester.
 - **R43** — The system shall allow an authenticated user to retrieve all personal data associated with their account.
-- **R44** — The system shall allow an authenticated user to request deletion of their account and associated personal data.
-- **R45** — The system shall expose, via a dedicated endpoint, aggregate metrics on the contact rate of suggested freelancers and the acceptance rate of suggested projects.
-- **R46** — The system shall allow the `Client` owner of an `open` `Project` to update its title and description.
+- **R44** — The system shall expose, via a dedicated endpoint, aggregate metrics on the contact rate of suggested freelancers and the acceptance rate of suggested projects.
+- **R45** — The system shall allow the `Client` owner of an `open` `Project` to update its title and description.
 
 #### 2.4.8 Traceability matrix
 ![Traceability matrix — Figure 1](images/traceability_matrix.png)
@@ -501,7 +500,7 @@ Two domain entities have a lifecycle whose transitions are non-trivial and are r
 
 #### 3.2.1 Project lifecycle
 
-Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `inProgress`, `completed`) and only two non-trivial transitions: `open → inProgress` (triggered by the acceptance of a proposal, R15/R16) and `inProgress → completed` (triggered by the client marking the project as completed, R18). The state `open` admits a self-transition corresponding to updates of the project's own metadata (R46), allowed while the project has not yet entered the in-progress phase. The state `completed` is terminal as far as the `Project` itself is concerned: the subsequent submission of reviews is governed by the lifecycle of `Review`, which is intentionally not included here as a separate FSM because it consists of a single state transition (a `Review` is either submitted or it does not exist, and once submitted it cannot be modified — see R32).
+Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `inProgress`, `completed`) and only two non-trivial transitions: `open → inProgress` (triggered by the acceptance of a proposal, R15/R16) and `inProgress → completed` (triggered by the client marking the project as completed, R18). The state `open` admits a self-transition corresponding to updates of the project's own metadata (R45), allowed while the project has not yet entered the in-progress phase. The state `completed` is terminal as far as the `Project` itself is concerned: the subsequent submission of reviews is governed by the lifecycle of `Review`, which is intentionally not included here as a separate FSM because it consists of a single state transition (a `Review` is either submitted or it does not exist, and once submitted it cannot be modified — see R32).
 
 ![Project FSM — Figure 4](images/fsm_project.png)
 
