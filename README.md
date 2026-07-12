@@ -1,5 +1,5 @@
 # FreelanceMatch – SE4A Project A
-**Politecnico di Milano | A.Y. 2024-2025 | Software Engineering for Automation**
+**Politecnico di Milano | A.Y. 2025-2026 | Software Engineering for Automation**
 
 **Group:** Luca Olmo · Antonio Palladino · Francesca Pensotti
 
