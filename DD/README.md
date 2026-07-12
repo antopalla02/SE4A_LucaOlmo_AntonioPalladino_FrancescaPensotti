@@ -11,4 +11,4 @@ This folder contains the Design Document for the FreelanceMatch platform.
 6. References
 
 ## Status
-- [ ] In progress
+- [ ] Completed
