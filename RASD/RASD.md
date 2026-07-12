@@ -41,8 +41,6 @@ Software Engineering for Automation — A.Y. 2025-2026
   - [3.2 Finite state machines](#32-finite-state-machines)
 - [4. References](#4-references)
 
----
-
 ## Revision history
 
 | Version | Date       | Notes                                                                                   |
@@ -52,8 +50,6 @@ Software Engineering for Automation — A.Y. 2025-2026
 | 0.3     | 2026-05-05 | Added Sec. 2.1 (Scenarios) and Sec. 2.2 (Domain model).                                 |
 | 0.4     | 2026-05-05 | Sec. 2.1 rewritten in engineering style (flow-based descriptions, preconditions, exceptions). Sec. 2.2 unchanged. |
 | 0.5     | 2026-07-07 | Complete revision 
-
----
 
 ## 1. Introduction
 
@@ -159,8 +155,6 @@ The remainder of this document is organised as follows.
 
 **Section 4 (References)** lists the external sources cited throughout the document.
 
----
-
 ## 2. Overall description
 
 ### 2.1 Scenarios
@@ -188,8 +182,6 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Incomplete mandatory fields.* The system refuses to persist the profile and reports the missing fields; the user remains in an unauthenticated or partially configured state.
 - *Skill not present in the catalogue.* The freelancer can request the addition of a new `Skill`; until the request is approved, the corresponding `Competence` is not used by the matching.
 
----
-
 #### S2 — Project publication and computation of the candidate ranking
 
 **Primary actor.** An authenticated `Client`.
@@ -208,8 +200,6 @@ The scenarios cover the lifecycle of the system from registration to review and 
 **Alternatives and exceptions.**
 - *No freelancer satisfies the hard filters.* The system creates the project with an empty ranking and informs the client. The project remains open for manual applications.
 - *Profile updates after publication.* If a freelancer updates the profile in a way that would have made them eligible for a project still in `open` state, the matching is recomputed for that project (the trigger is on profile-update events as well, per the *Observer* contract in Deliverable 2).
-
----
 
 #### S3 — Submission of a proposal by a freelancer
 
@@ -230,8 +220,6 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Project moved to* `inProgress` *between display and submission* (i.e. another proposal was accepted in the meantime). Same handling as the previous case.
 - *Duplicate proposal* (R14). The system rejects the second submission and points the freelancer to the existing one.
 
----
-
 #### S4 — Acceptance of a proposal and transition to `inProgress`
 
 **Primary actor.** The `Client` owner of the project.
@@ -251,8 +239,6 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Concurrent acceptance attempts.* The transitions in step 3 are serialised; the second attempt observes `status ≠ open` and is rejected.
 - *Cancellation by the client before acceptance.* (Out of scope of this iteration; an open project can only transition to `inProgress` or remain `open` until the deadline.)
 
----
-
 #### S5 — Completion of the collaboration and mutual review
 
 **Primary actor.** The `Client` owner of the project (for completion); both parties (for the review).
@@ -271,8 +257,6 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *One party never submits the review.* The system does not block the lifecycle: the missing review simply does not exist; the existing one is still recorded and counted.
 - *Attempt to edit a submitted review.* The system rejects the modification (review is single-shot by definition).
 
----
-
 #### S6 — Manual search and filtered browsing
 
 **Primary actor.** Any authenticated user.
@@ -290,7 +274,6 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Empty result set.* The system returns the empty list with an explicit indication; no error.
 - *Filter values inconsistent with the catalogue* (e.g. budget range that no project satisfies). Same handling as empty result set.
 
----
 
 The flows above span every shared phenomenon listed in Sec. 1.2.2 at least once: WP1, WP3 in S1; WP2 in S2; WP4 in S3 (and reused in S6 as the entry point); WP5 in S4; WP6, WP7 in S5; WP8 in S6; MP1 and MP3 are exercised in multiple scenarios (S2, S3, S4, S5); MP2 in S2; MP4 is implicitly exercised whenever any scenario produces a state change; MP5 in S5.
 
@@ -338,8 +321,6 @@ A freelancer is expected to submit proposals to several `Project`s concurrently 
 A freelancer is expected to interact with the platform more frequently than a client: profile maintenance, inspection of suggested projects, application to one or more of them, follow-up on pending proposals *(NFR1, NFR3)*.
  
 A freelancer has a direct incentive to see good work reflected back into future opportunities: reputation accumulated from past collaborations is not just a display value but a live input to every subsequent ranking computed for that freelancer *(G4, R33, R40)*. As with the client, when the automatic ranking does not surface every project a freelancer would consider, manual search remains available as a fallback *(R28, G5)*.
-
----
 
 ### 2.4 Product functions
 
@@ -415,7 +396,6 @@ This section enumerates the functional requirements of the system. Requirements 
 #### 2.4.8 Traceability matrix
 ![Traceability matrix — Figure 1](images/traceability_matrix.png)
 
----
 
 ### 2.5 Non-functional aspects
 
@@ -438,8 +418,6 @@ The following non-functional requirements (NFR) are organised by the ISO/IEC 250
 - **NFR6** — A first-time user shall be able to complete registration and profile setup within 5 minutes without external assistance, in ≥ 90% of cases.
 
 **Note:** At this stage of the project, none of the non-functional requirements above has been verified against a running system: doing so — measuring response times under load, monthly uptime, or first-time-user completion rates — requires a deployed instance and, in several cases, real users or realistic traffic, which are not available yet. The NFRs are nonetheless stated here, with concrete thresholds, to make explicit what a production-quality version of the system would be expected to satisfy. For this reason, the numeric thresholds (95th percentile, uptime percentages, time limits) should be read as indicative reference values rather than as figures that have been measured or validated.
-
----
 
 ### 2.6 Assumptions, dependencies and constraints
 
@@ -469,8 +447,6 @@ The following assumptions are about the *world* and the system cannot enforce th
 - **C4** — Dispute resolution between the two parties of a collaboration is out of scope. The system records the resulting reviews (if any) but does not attempt to mediate the dispute.
 - **C5** — The compatibility-score weights and the size *N* of the ranking truncation are configuration parameters, not user-facing settings. The decision of when and how to retune them is taken by the administrator.
 - **C6** — The matching algorithm is intended to operate on the catalogue of profiles available on the platform; it does not consult external sources (e.g. professional networks, public CVs).
-
----
 
 ## 3. Additional models
 
@@ -509,8 +485,6 @@ Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `in
 Figure 5 shows the lifecycle of a `Proposal`. There are three states (`pending`, `accepted`, `rejected`). The transition from `pending` to `accepted` corresponds to the explicit choice of the client owner of the parent project. The transition from `pending` to `rejected` has two sources: the explicit rejection of a proposal is not foreseen as a separate action in this iteration of the system (a client can only accept; the rejection of the other proposals is a cascading effect of the acceptance, R16). Both terminal states are final: once a proposal is accepted or rejected, it cannot be reverted (R15 admits at most one accepted proposal per project, and a rejected proposal is not allowed to be re-evaluated).
 
 ![Proposal FSM — Figure 5](images/fsm_proposal.png)
-
----
 
 ## 4. References
 
