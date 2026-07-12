@@ -15,6 +15,6 @@ FreelanceMatch is a web-based platform that automates the matching between freel
 
 ## Project Status
 - [x] Proposal approved
-- [ ] RASD
-- [ ] Design Document
-- [ ] Implementation
+- [x] RASD
+- [x] Design Document
+- [x] Implementation
