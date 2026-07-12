@@ -9,4 +9,4 @@ This folder contains the RASD for the FreelanceMatch platform.
 4. References
 
 ## Status
-- [ ] In progress
+- [ ] Completed
