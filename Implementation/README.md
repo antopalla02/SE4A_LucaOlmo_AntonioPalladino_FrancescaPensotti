@@ -69,4 +69,4 @@ pytest -q
 
 ## Status
 
-[ ] Completed
+[x] Completed
