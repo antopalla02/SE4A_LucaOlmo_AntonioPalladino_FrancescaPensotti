@@ -231,7 +231,7 @@ the OpenAPI surface of Sec. 3. `events` is described in Sec. 2.3.3 /
 
 Figure 2 is the implementation-level refinement of the conceptual domain model of RASD Sec. 2.2.  The refinement consists of the operations each entity exposes and the enumerations backing the `status` and `level` attributes, whose values are exactly the state names of RASD Sec. 3.2.
 
-![Class view: domain — Figure 2](images/class_domain.png)
+![Class view: domain — Figure 2](images/class_domain_DD.png)
 
 
 
@@ -261,7 +261,7 @@ extra query.
 
 Figure 3 shows the `matching` package, the realisation of the *Strategy* pattern required by R26.
 
-![Class view: matching — Figure 3](images/class_matching.png)
+![Class view: matching — Figure 3](images/class_matching_DD.png)
 
 `MatchingStrategy` is the interface the application layer depends on. It
 exposes the two ranking directions required by G1 and G2 — client-side
@@ -296,7 +296,7 @@ The remaining scenarios follow the uniform shape of Sec. 2.1.2 — `api` → use
 
 Figure 6 shows the publication of a project (RASD scenario S2; requirements R8–R12, R19–R22, R24, R25, R35).
 
-![Runtime view S2 — Figure 6](images/runtime_s2_publication.png)
+![Runtime view S2 — Figure 6](images/runtime_s2_publication_DD.png)
 
 The flow splits cleanly into two parts, separated by the commit.
 
@@ -357,7 +357,7 @@ seconds NFR2 allows for a catalogue of the stated size.
 
 Figure 7 shows the acceptance of a proposal (RASD scenario S4; requirements R15, R16, R17, R37, R41, R42).
 
-![Runtime view S4 — Figure 7](images/runtime_s4_acceptance.png)
+![Runtime view S4 — Figure 7](images/runtime_s4_acceptance_DD.png)
 
 This is the flow where the transactional decision lives, and the diagram makes its boundaries explicit.
 
@@ -385,7 +385,7 @@ if the losing client retries the request, the project now reads as
 
 The RASD introduces the propagation of publication side effects as "the reaction of an observer to the `ProjectPublished` event, anticipating the Observer contract that will be formalised in Deliverable 2". Figure 8 is that formalisation: how a handler comes to be called, and in which direction control flows when it is.
 
-![Runtime view: Observer dispatch — Figure 8](images/runtime_observer_dispatch.png)
+![Runtime view: Observer dispatch — Figure 8](images/runtime_observer_dispatch_DD.png)
 
 In **registration**, performed once per request by the composition root, a `UnitOfWork`, a bus and an `EventHandlers` bundle are constructed, and each handler is subscribed to the event type it handles. 
 
