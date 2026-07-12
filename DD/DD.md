@@ -114,7 +114,7 @@ two replaceability requirements of the RASD achievable without touching
 the business logic — R26 for the matching strategy, DEP1 for the data
 store.
 
-![Component view — Figure 1](images/component_view.png)
+![Component view — Figure 1](images/component_view_DD.png)
 
 The arrows labelled `via IMatchingStrategy` / `via IEventBus` /
 `via IRepository` cross a replaceability boundary: `application` and
