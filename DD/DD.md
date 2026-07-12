@@ -5,7 +5,6 @@
 ### FreelanceMatch
 *A web platform for automatic freelancer–client matching*
 
----
 
 **Politecnico di Milano**
 Software Engineering for Automation — A.Y. 2025-2026
@@ -15,7 +14,7 @@ Software Engineering for Automation — A.Y. 2025-2026
 | | |
 |---|---|
 | **Authors** | Olmo Luca (10838404), Palladino Antonio (10778757), Pensotti Francesca (10777621) |
-| **Repository** | `https://github.com/<owner>/SE4A_LucaOlmo_AntonioPalladino_FrancescaPensotti` |
+| **Repository** | `https://github.com/antopalla02/SE4A_LucaOlmo_AntonioPalladino_FrancescaPensotti.git` |
 
 ---
 
@@ -34,25 +33,28 @@ Software Engineering for Automation — A.Y. 2025-2026
 - [3. User Interface Design](#3-user-interface-design)
 - [4. Requirements Traceability](#4-requirements-traceability)
 - [5. Implementation, Integration and Test Plan](#5-implementation-integration-and-test-plan)
-- 6. References *(TBD)*
+- [6. References](#6-references)
 
----
+
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-This document describes the design of FreelanceMatch, whose requirements are specified in the Requirements Analysis and Specification Document (RASD). While the RASD answers the question of *what* the system must do (its goals (G1–G6), its functional requirements (R1–R32) and the qualities it must exhibit (NFR1–NFR17)),  this document answers the question of *how* the system is organised to do it.
+This document describes the design of FreelanceMatch, the web platform for automatic freelancer–client matching whose requirements are specified in the Requirements Analysis and Specification Document (RASD) of Deliverable 1. While the RASD answers the question of *what* the system must do — its goals (G1–G5), its functional requirements (R1–R45) and the qualities it must exhibit (NFR1–NFR6) — this document answers the question of *how* the system is organised to do it.
 
 The main goals of the project, stated in full in RASD Sec. 1.1, are recalled here in compact form to keep this document self-contained:
 
 - **G1/G2** — bidirectional automatic matching: ranked freelancers for every published project, ranked projects for every registered freelancer;
 - **G3** — management of the full project lifecycle with the constraints of each phase;
 - **G4** — reputation derived from mutual reviews, fed back into the matching;
-- **G5** — replaceability of the matching algorithm without changes to the rest of the system;
-- **G6** — manual search complementary to the automatic matching.
+- **G5** — manual search, so that both parties can look for a counterpart and decide independently of the suggested ranking.
 
-The design presented here is organised around three architectural decisions, each anticipated in the RASD and motivated in Sec. 2.4 of this document: a *Strategy* interface that isolates the matching algorithm (G5, R20, NFR15); an *Observer*-based event mechanism that decouples lifecycle transitions from their side effects (notifications, ranking recomputation); and a *Repository* layer that abstracts data access so that the domain logic can be tested against in-memory implementations.
+The design presented here is organised around four decisions, each anticipated in the RASD and motivated in Sec. 2.4 of this document:
+
+- a *Strategy* interface that isolates the matching algorithm, so that the active strategy is substitutable by configuration (R26) and two strategies can be compared through the metrics of R44;
+- an *Observer*-based event mechanism that decouples lifecycle transitions from their side effects — notifications (R35–R38) and ranking recomputation (R19, R21, R23);
+- a *Repository* layer that abstracts data access, so that the domain logic can be tested against in-memory implementations and the choice of store stays open, as DEP1 assumes;
 
 The target implementation, described in Sec. 5, is a Python web service exposing a REST API (FastAPI) backed by a relational store (SQLite via SQLAlchemy); the system is delivered API-first, with the auto-generated OpenAPI interface serving as the demonstration UI (see Sec. 3).
 
@@ -64,8 +66,10 @@ The definitions of the domain terms (Client, Freelancer, Project, Proposal, Revi
 |---|---|
 | **Component** | A unit of the system with a well-defined responsibility and an explicit interface towards the other components. In this design, components correspond to Python packages. |
 | **Use case (application service)** | The orchestration of a single user-triggered flow (one of the scenarios S1–S6 of RASD Sec. 2.1), implemented as one application-layer module that coordinates domain entities, repositories and events. |
+| **Aggregate / aggregate root** | A cluster of entities loaded, mutated and saved as a unit, addressed through a single root entity. `Project` is the only aggregate root of this design (Sec. 2.2.1). |
 | **Event bus** | The in-process publish/subscribe mechanism through which lifecycle events are propagated to their observers. |
-| **Domain layer** | The set of entities, value objects and invariants of RASD Sec. 2.2, implemented without dependencies on frameworks, persistence or transport. |
+| **Domain layer** | The set of entities and value objects of RASD Sec. 2.2, implemented without dependencies on frameworks, persistence or transport. |
+| **Lifecycle rule** | A constraint on the admissible states or transitions of an entity, stated as a requirement in RASD Sec. 2.4 (e.g. R14, R15, R31) and enforced inside the entity that owns it. |
 | **DTO** | Data Transfer Object: the request/response schema exposed by the REST API, distinct from the domain entities. |
 
 | Acronym | Meaning |
@@ -81,7 +85,10 @@ The definitions of the domain terms (Client, Freelancer, Project, Proposal, Revi
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 0.1 | 2026-06-12 | Section 1-2 |
+| 0.1 | 2026-06-10 | Initial draft. Section 1 (Introduction). |
+| 0.2 | 2026-06-20 | Added 2.1 2.2 2.3 2.4 |
+| 0.3 | 2026-07-01 | Added section 3 4 5. |
+| 1.0 | 2026-07-12 | Added section 6 + revision and fixes. |
 
 ### 1.4 Document structure
 
@@ -89,275 +96,737 @@ The definitions of the domain terms (Client, Freelancer, Project, Proposal, Revi
 
 **Section 3 (User Interface Design)** describes the interface through which the system is operated, which in this API-first delivery is the auto-generated OpenAPI (Swagger) console.
 
-**Section 4 (Requirements Traceability)** maps the requirements R1–R32 of the RASD onto the design elements introduced in Section 2, extending the traceability matrix of RASD Sec. 2.4.7.
+**Section 4 (Requirements Traceability)** maps the requirements R1–R45 of the RASD onto the design elements introduced in Section 2.
 
 **Section 5 (Implementation, Integration and Test Plan)** defines the order in which the components will be implemented, the order in which they will be integrated, and the strategy for testing the integration.
 
 **Section 6 (References)** lists the sources cited in this document.
-
----
-
 ## 2. Architectural Design
 
 ### 2.1 Component view
 
-Figure 1 shows the components of the system and the dependencies between them. The architecture is layered: each component belongs to one of four layers — presentation, application, domain, infrastructure — and dependencies point inward, towards the domain. The domain layer has no outgoing dependency: it does not know how it is stored, how it is exposed over the network, or which concrete matching algorithm is active. This direction of dependencies is the single most important property of the architecture, because it is what makes the three replaceability requirements of the RASD (R20/NFR15 for the matching strategy, DEP1/Sec. 2.6.2 for the data store) achievable without touching the domain logic.
+Figure 1 shows the six components of the system, one per Python package:
+`api`, `application`, `matching`, `events`, `repositories`, `domain`. Every
+dependency points inward, towards the domain, which has no outgoing
+dependency: it does not know how it is stored, how it is exposed over the
+network, or which matching algorithm is active. This is what makes the
+two replaceability requirements of the RASD achievable without touching
+the business logic — R26 for the matching strategy, DEP1 for the data
+store.
 
 ![Component view — Figure 1](images/component_view.png)
 
-The components, their responsibilities and the interfaces they export are described below. Component names correspond one-to-one to the Python packages of the implementation (Sec. 5), so that the mapping between this document and the source tree is direct.
+The arrows labelled `via IMatchingStrategy` / `via IEventBus` /
+`via IRepository` cross a replaceability boundary: `application` and
+`events` depend on an interface, not on a concrete implementation, so
+`matching` and `repositories` can each be swapped without any caller
+changing. 
 
 #### 2.1.1 API Gateway (`api`)
 
-The single entry point of the system. It exposes the REST interface described by the auto-generated OpenAPI specification (Sec. 3), translates HTTP requests into invocations of the application-layer use cases, and translates the results (or the domain errors) back into HTTP responses with the appropriate status codes. The component contains no business logic: every rule lives in the layers below. 
+The single entry point of the system. It exposes the REST interface described by the auto-generated OpenAPI specification (Sec. 3), translates HTTP requests into invocations of the application-layer use cases, and translates results and errors back into HTTP responses. The component contains no business logic.
+
+Exported interface: the **REST/OpenAPI** surface, one router per requirement cluster of RASD Sec. 2.4 (accounts R1–R10, project lifecycle R11–R18, matching R19–R26, search R27–R29, reviews R30–R34, notifications and dashboard R35–R40, cross-cutting R41–R45).
 
 #### 2.1.2 Use Cases (`application`)
 
-One module per scenario of RASD Sec. 2.1: `register_user` (S1), `publish_project` (S2), `submit_proposal` (S3), `accept_proposal` (S4), `complete_and_review` (S5), `manual_search` (S6). Each use case orchestrates the same four collaborators: it loads and saves entities through **IRepository**, invokes the active matching algorithm through **IMatchingStrategy** when needed, mutates the domain entities (which enforce their own invariants), and publishes lifecycle events through **IEventBus**. The use case layer is also where transactional boundaries are drawn: the atomic block of R12 (acceptance + cascading rejections + project transition) is delimited here, around the corresponding repository operations (NFR6).
+One module per scenario of RASD Sec. 2.1: `register_user` (S1, with profile update and skill request), `publish_project` (S2), `submit_proposal` (S3), `accept_proposal` (S4), `complete_and_review` (S5), `manual_search` (S6), `update_project` (S7 — the `Client` owner edits a project's title/description while it is still `open`).
+
+Every use case is a class whose collaborators are injected through the constructor — a `UnitOfWork` and an `IEventBus`, or a `MatchingStrategy` in place of the bus for the read-only `manual_search` — and whose `execute` method has the same four-step shape:
+
+1. **load** the entities involved, through the repository interfaces;
+2. **delegate the decision** to a domain entity method, which validates, mutates, and returns the events its transition implies;
+3. **persist and commit** — this is where the transactional boundary is drawn, and where the atomicity of R16 is realised;
+4. **publish** the returned events, strictly after the commit.
+
+`manual_search` and `update_project` are both exceptions to this shape. `manual_search` is read-only: there is nothing to persist or commit, and no event to publish (it stops after step 1); `update_project` is a self-transition with no side effect on any other aggregate, so it returns no event and (steps 1–3 apply).
+
+What a use case must *not* contain is a business rule: any condition that decides whether a transition is legal belongs to the entity. What legitimately remains is authorisation (is the actor the project owner? R15, R42), the cross-aggregate lookups an entity cannot perform (is this skill in the controlled vocabulary? R9), and the ordering of persistence and publication.
+
+Exported interface: the `execute` operations, one per scenario, consumed only by `api`.
 
 #### 2.1.3 Domain Model (`domain`)
 
-The implementation of the entities and invariants of RASD Sec. 2.2: `User` (with `Client` and `Freelancer`), `Skill`, `Competence`, `Availability`, `Project`, `Proposal`, `Review`. State transitions follow exactly the finite state machines of RASD Sec. 3.2; invalid transitions and violations of the invariants DOM1–DOM7 raise domain errors that the upper layers translate into user-facing failures. The component depends on nothing: it is plain Python, importable and testable in isolation.
+The implementation of the entities and relationships of RASD Sec. 2.2: `User` (with `Client` and `Freelancer`), `Skill`, `Competence`, `Availability`, `Project`, `Proposal`, `Review`. 
+The `domain` package also declares `domain events` and `domain errors`.
+
+- `domain events` : `ProjectPublished`, `ProposalReceived`,
+  `ProposalAccepted`, `CollaborationCompleted`, `ReviewSubmitted`,
+  `ProfileUpdated`.
+- `domain errors` : split into three categories: malformed input
+  (`ValidationError`), violated business rule (`InvariantViolation`),
+  illegal state transition (`IllegalTransition`).
+
+The component depends on nothing: no framework, no ORM, no transport. It is importable and testable in isolation, which is the precondition for the domain tests to run without a database or a web server.
 
 #### 2.1.4 Matching (`matching`)
 
-The implementation of the matching procedure behind the **IMatchingStrategy** interface (R20). The interface exposes a single operation, `rank(project, candidates) → ordered list of (freelancer, score)`, plus its symmetric counterpart for the freelancer-side ranking. Two concrete strategies are provided: `WeightedScoreStrategy`, implementing the score S(P,F) of R18 with its four weighted sub-scores and the hard filters of R19; and `RuleBasedStrategy`, the sequential-criteria baseline used for the quality comparison described in the project proposal (NFR16). The active strategy is selected by configuration at startup; adding a third strategy requires implementing the interface and registering it, with no change to any other component (NFR15).
+The matching procedure behind the **IMatchingStrategy** interface (R26). The interface exposes the two ranking directions of G1 and G2 as two operations — `rankFreelancers(project, candidates)` and `rankProjects(freelancer, openProjects)` — both returning results ordered by decreasing score; truncation to the configurable length *N* of R19/C5 is left to the caller, so the strategy carries no presentation concern.
+
+Two implementations are provided: `WeightedScoreStrategy`, realising the score *S(P,F)* of R24 with the hard filters of R25, and `RuleBasedStrategy`, the sequential-criteria baseline against which the active strategy is compared through the metrics of R44. The active one is selected by configuration at startup; adding a third requires implementing the interface and adding one configuration value, with no change to any other component.
+
+Exported interface: **IMatchingStrategy**, plus the two configuration value objects `MatchingWeights` and `HardFilterConfig`.
 
 #### 2.1.5 Event Bus (`events`)
 
-The in-process publish/subscribe mechanism behind the **IEventBus** interface. Use cases publish typed lifecycle events — `ProjectPublished`, `ProposalReceived`, `ProposalAccepted`, `CollaborationCompleted`, `ProfileUpdated` — and handlers registered at startup react to them: notification creation (R28–R31), ranking recomputation on profile updates (R16, R17), reputation refresh on review submission (R27). The publisher does not know its subscribers; adding a new side effect to an existing event means adding a new handler, not modifying the use case that publishes it.
+The in-process publish/subscribe mechanism behind the **IEventBus** interface, together with the handlers that subscribe to it. Use cases publish typed lifecycle events; handlers registered at startup react to them, creating notifications (R35–R38), computing and refreshing rankings (R19, R21, R23) and recording the matching-quality metrics that R44 exposes.
+
+The bus maps event types to handler callables and invokes them synchronously on publication. It never imports `application`: the callables reach it through `subscribe`, so the publisher does not know its subscribers, and adding a side effect to an existing event means registering one more handler rather than editing the use case that publishes it.
+
+Exported interface: **IEventBus** — `subscribe(eventType, handler)` and `publish(event)`.
 
 #### 2.1.6 Repositories (`repositories`)
 
-The data-access layer behind the **IRepository** interface family (one repository per aggregate: users, projects, proposals, reviews, notifications, skills). Two implementations are provided: the SQLite/SQLAlchemy implementation used at runtime, and an in-memory implementation used by the test suite, which makes the domain and application layers testable without a database (the rationale anticipated in RASD Sec. 2.6.2/DEP1). The repository layer is the only component allowed to touch the database.
+The data-access layer behind the **IRepository** family — one interface
+per independent entity (users, projects, reviews, notifications, skills)
+plus two supporting ones for the persisted ranking projection and the R44
+counters — and the **UnitOfWork** that bundles them into one
+transactional context.
+
+Two implementations are provided, serving different purposes:
+
+- **SQLite implementation** — used at runtime. It realises the
+  `IRepository` interfaces, handling all database access and converting
+  between ORM rows and domain entities in both directions (`save()` maps
+  entities to rows, `get()`/`get_with_proposals()` reconstructs entities
+  from rows). Choosing SQLite as the data store is what satisfies DEP1,
+  since it provides the transactional guarantees that dependency
+  requires; its commit strategy is what then realises R16.
+
+- **In-memory implementation** — used by the test suite. It stores
+  entities in plain Python dictionaries instead of a database, so domain
+  and application-layer tests run in milliseconds with no setup and no
+  external dependency. It satisfies the same `IRepository` interfaces as
+  the SQLite implementation, so the use cases run unmodified against
+  either one — only the wiring in the composition root changes.
+
+
+Exported interface: the **IRepository** family and **UnitOfWork** (`commit`, `rollback`).
 
 #### 2.1.7 Dependency rules
 
-The dependency rules, visible as arrow directions in Figure 1, are summarised below; they will be enforced during implementation by the package import structure.
+The dependency rules, visible as arrow directions in Figure 1, are enforced by the import structure: a violation is either an import cycle or an import of a concrete class where an interface is expected.
 
 | Component | May depend on | Must not depend on |
 |---|---|---|
-| `api` | `application` | `domain`, `matching`, `events`, `repositories` directly |
-| `application` | `domain`, and the three interfaces (`IMatchingStrategy`, `IEventBus`, `IRepository`) | concrete implementations in `matching`, `events`, `repositories` |
+| `api` | `application`, and the interfaces it must name to wire them | business rules of any kind |
+| `application` | `domain`, and the three interfaces (`MatchingStrategy`, `IEventBus`, `UnitOfWork`) | concrete implementations in `matching`, `events`, `repositories` |
 | `domain` | nothing | everything else |
-| `matching` | `domain` | `application`, `api`, `repositories` |
-| `events` | `domain` (event payloads) | `api` |
-| `repositories` | `domain` | `application`, `api`, `matching` |
+| `matching` | `domain` | `application`, `api`, `repositories`, `events` |
+| `events` | `domain`, and the interfaces `UnitOfWork` and `MatchingStrategy` used by the handlers | `application`, `api` |
+| `repositories` | `domain` | `application`, `api`, `matching`, `events` |
 
 ### 2.2 Class view
 
-This section refines two of the components introduced in Sec. 2.1 down to the class level: the Domain Model and the Matching component. These two are the ones whose internal structure carries actual design decisions; the remaining components (API Gateway, Use Cases, Event Bus, Repositories) are intentionally thin — their structure is one module per responsibility, fully described by Sec. 2.1 and by the runtime view of Sec. 2.3, and a class diagram would add no information.
+This section refines some the components of Sec. 2.1  providing their class views; first the domain, then matching.
+
+The other components have no class diagram here — their structure is
+already covered elsewhere. The API Gateway is entirely determined by
+the OpenAPI surface of Sec. 3. `events` is described in Sec. 2.3.3 /
+2.4.3. `repositories` is described in Sec. 2.4.4.
+
+
 
 #### 2.2.1 Domain Model
 
-Figure 2 shows the classes of the `domain` package. The diagram is the implementation-level refinement of the conceptual domain model of RASD Sec. 2.2: the entities, associations and multiplicities are unchanged, and the refinement consists of (i) concrete attribute types, (ii) the behavioural methods that each entity exposes, and (iii) the explicit enumerations backing the `status` attributes.
+Figure 2 is the implementation-level refinement of the conceptual domain model of RASD Sec. 2.2.  The refinement consists of the operations each entity exposes and the enumerations backing the `status` and `level` attributes, whose values are exactly the state names of RASD Sec. 3.2.
 
 ![Class view: domain — Figure 2](images/class_domain.png)
 
-The key design decision in this diagram is that **state transitions are methods of the entities themselves**, not procedures of the application layer. `Project.accept_proposal()` and `Project.mark_completed()` implement the FSM of RASD Sec. 3.2.1; `Proposal.accept()` and `Proposal.reject()` implement the FSM of RASD Sec. 3.2.2. Each method checks the current state and raises a `DomainError` when the requested transition is not legal. For instance, `accept_proposal()` on a project whose status is not `OPEN` fails before any side effect occurs. This placement guarantees that the invariants DOM1–DOM7 cannot be bypassed: there is no code path that mutates a `status` attribute directly, so any caller, present or future, goes through the validating methods.
 
-Transition methods return the list of `DomainEvent`s that the transition implies (e.g. `accept_proposal()` returns a `ProposalAccepted` event carrying the identifiers of the accepted and rejected proposals). The entity *decides* which events occurred; the application layer *publishes* them on the event bus after the transaction commits. This split keeps the domain free of any dependency on the event infrastructure while still making the entity the single source of truth for what happened.
 
-`User.reputation` is stored as a plain attribute and recomputed by `update_reputation(reviews)` upon submission of a new review (R27, DOM7), rather than being recalculated on every read: the trade-off favours read performance (reputation is read by every matching computation) at the negligible cost of one extra write per review.
+**State transitions are operations of the entities themselves**, not procedures of the application layer. `Project.acceptProposal()` and `Project.markCompleted()` implement the FSM of RASD Sec. 3.2.1; `Proposal.accept()` and `Proposal.reject()` implement the FSM of RASD Sec. 3.2.2. Each checks the current state and raises a domain error when the transition is not legal, before any side effect occurs. This placement is what guarantees that the lifecycle rules cannot be bypassed: no code path mutates a `status` attribute directly, so every caller goes through the validating operations. The same holds for construction: `Project.create()` is a factory enforcing R11 and setting `status = open` per R12, so an invalid project is not representable. `updateMetadata()` is the self-transition of R45, and it refuses to run once the project has left `open`.
+
+Transition operations **return the events they imply** rather than dispatching them. `acceptProposal()` returns a `ProposalAccepted` naming the accepted proposal and the rejected freelancers — the entity is the only object that knows which proposals it rejected, so making it the source of that payload avoids a second traversal in the caller. The entity *decides* what happened; the application layer *publishes* it after the commit (Sec. 2.3). The split keeps the domain free of any dependency on the event infrastructure while leaving the entity the single source of truth.
+
+`Project` and `Proposal` are related by **composition** in the RASD
+model — a `Proposal` has no existence independent of the `Project` it
+was submitted to. In the design, this composition is realised as an
+**aggregate**: `Project` is the aggregate root, `Proposal` lives inside
+its consistency boundary, and the two are always loaded, mutated and
+saved together, never separately.
+
+The reason this boundary exists is R16: accepting a proposal changes
+three things at once — the chosen proposal becomes accepted, every other
+pending proposal becomes rejected, the project becomes `in_progress` —
+and R16 requires these three changes to happen atomically. Treating
+`Project` and its `Proposal`s as a single unit is what makes that
+possible, and it is also what lets the constraint of R15 (at most one
+accepted proposal per project) be checked directly in memory, without an
+extra query.
+
+**`Review` has no update operation.**, the class simply exposes no method to modify a review once created. This is how R32 (reviews are immutable) is realised.
 
 #### 2.2.2 Matching
 
-Figure 3 shows the classes of the `matching` package, the concrete realisation of the *Strategy* pattern required by R20/NFR15.
+Figure 3 shows the `matching` package, the realisation of the *Strategy* pattern required by R26.
 
 ![Class view: matching — Figure 3](images/class_matching.png)
 
-`MatchingStrategy` is the interface the application layer depends on. It exposes the two ranking directions of G1/G2 as separate operations — `rank_freelancers(project, candidates)` and `rank_projects(freelancer, open_projects)` — both returning ordered lists of scored results, truncated to the configured length *N* by the caller.
+`MatchingStrategy` is the interface the application layer depends on. It
+exposes the two ranking directions required by G1 and G2 — client-side
+("rank freelancers for this project") and freelancer-side ("rank
+projects for this freelancer") — as two separate operations, both
+returning a list of `ScoredResult`: a pair of entity id and score,
+rather than the full entity. The ranking is only ever persisted as a
+projection and serialised to the client, and neither use needs more
+than the id — carrying the full entity would duplicate data without any need.
 
-`WeightedScoreStrategy` is the default implementation and realises the score S(P,F) of R18. The four sub-scores (`s_skills`, `s_budget`, `s_reputation`, `s_availability`) are private methods, each normalised in [0,1]; `compute_score` combines them with the weights held by the `MatchingWeights` value object, whose `validate()` enforces that the weights sum to one. Hard filters (R19) are applied before any score is computed, so excluded candidates never enter the scoring loop. Keeping the weights in a separate value object (rather than as constructor arguments) gives the administrator-facing configuration of RASD C5 a single, validated home.
+Both operations are pure functions of their arguments — the score
+depends only on the `project`/`freelancer` and candidates passed in,
+never on anything from a previous call. A strategy carries no mutable
+state beyond its fixed configuration (weights, filters), so one instance
+can be created once at startup and safely reused across every concurrent
+request, with no risk of one computation interfering with another.
 
-`RuleBasedStrategy` is the second implementation, used as the comparison baseline for the matching-quality assessment (NFR16): it ranks by sequential criteria the full skill coverage first, then budget feasibility, then decreasing reputation without any weighted combination.
+`WeightedScoreStrategy` realises the score of R24 as a weighted sum of four sub-scores, each normalised in [0,1]: skills coverage weighted by mastery level, budget compatibility (the estimated cost against the maximum budget), reputation, and the fraction of the project window covered by the freelancer's availability. The hard filters of R25 are applied **before** any score is computed, so an excluded candidate never enters the scoring loop. Both ranking directions reuse the same filter and the same score, which is what makes a strategy coherent across G1 and G2 by construction rather than by convention.
 
-The active strategy is chosen by configuration at application startup and injected into the use cases that need it (S2 publication, S6 search ordering, profile-update recomputations). No component other than the startup wiring knows which concrete class is active; replacing or adding a strategy therefore satisfies NFR15 by construction.
+The two configuration value objects are separate classes on purpose. `MatchingWeights` validates non-negativity and a unit sum at construction, so a configuration that violates R24 fails at startup rather than at the first ranking. `HardFilterConfig` holds the two parameters that turn the R25 rule into numbers. Keeping both out of the constructor signature gives the administrator-facing configuration of C5 a single validated home, and lets `RuleBasedStrategy` reuse the filter configuration without inheriting weights it does not have.
+
+`RuleBasedStrategy` is the comparison baseline against which the active strategy is assessed through the metrics of R44. It ranks by sequential criteria rather than a weighted combination — full skill coverage first, then budget feasibility, then decreasing reputation — and collapses the resulting lexicographic ordering into a displayable score, so that both strategies satisfy the same interface contract and the API surface does not change when the strategy does.
 
 ### 2.3 Runtime view
 
-This section shows how the components of Sec. 2.1 collaborate at runtime to accomplish the main scenarios of the system. The same selection criterion of RASD Sec. 3.1 applies, now at the design level: a runtime diagram is included only for the flows in which the *internal* collaboration between components carries design decisions that the component view alone cannot show. These are, again, S2 (project publication, where the matching strategy and the event propagation enter the picture) and S4 (proposal acceptance, where the transactional boundary is the decision). The remaining scenarios follow the same uniform pattern — `api` → use case → repository (→ event bus) — with no variation worth a dedicated diagram.
+This section shows how the components of Sec. 2.1 collaborate at runtime. The selection criterion of RASD Sec. 3.1 applies, now at the design level: a diagram is included only where the *internal* collaboration carries a decision the structural views cannot show. The two scenarios the RASD itself singles out — S2 and S4 — qualify again, for different reasons than at the requirements level. In S2, the design decides *where* the matching runs and, consequently, what the publication response can contain. In S4, the design decides where the atomic block of R16 begins and ends, and how two concurrent acceptances are actually serialised. 
+A third diagram covers the Observer dispatch, that is how the components communicate over the bus.
 
-Both diagrams use the components of Sec. 2.1 as lifelines, with the application layer depending only on the three interfaces (`IRepository`, `IMatchingStrategy`, `IEventBus`); the concrete implementations behind them are interchangeable, as discussed in Sec. 2.4.
+The remaining scenarios follow the uniform shape of Sec. 2.1.2 — `api` → use case → entity → repository → commit → publish — with no variation worth a figure. S3 and S5 are instances of it; S6 is the same shape minus the commit and the publish.
 
 #### 2.3.1 S2 — Project publication
 
-Figure 4 shows the runtime interaction for the publication of a project (RASD scenario S2, requirements R7, R8, R15, R16, R18, R19, R28).
+Figure 6 shows the publication of a project (RASD scenario S2; requirements R8–R12, R19–R22, R24, R25, R35).
 
-![Runtime view S2 — Figure 4](images/runtime_s2_publication.png)
+![Runtime view S2 — Figure 6](images/runtime_s2_publication.png)
 
-Three design decisions are visible in the diagram. First, **validation happens in the domain**: `Project.create(...)` enforces R7 (mandatory fields, deadline in the future, budget ≥ 0) and sets the initial state per R8; the use case never constructs a `Project` in an invalid state. Second, **the ranking computation goes through `IMatchingStrategy`**: the use case does not know whether the active strategy is the weighted-score or the rule-based one, which is the operational meaning of R20. Third, **side effects are observer-driven**: the use case publishes a single `ProjectPublished` event and terminates; the notification fan-out (R28) and the refresh of the freelancer-side suggested view (R16) happen in handlers subscribed to that event. Adding a further side effect to project publication — e.g. an audit log — would mean registering one more handler, with no change to `publish_project`.
+The flow splits cleanly into two parts, separated by the commit.
 
-The transaction in this flow covers only the persistence of the new project. The ranking computation runs after the commit: a failure in the matching must not roll back a correctly published project; in the worst case the ranking is recomputed on the next profile-update event, and the project remains visible in the catalogue for manual applications (consistently with the "empty ranking" alternative flow of RASD S2).
+**Before the commit: only what publication itself requires.**
+The use case resolves the actor and checks it is a client; checks each
+required skill against the controlled vocabulary of R8/R9 — a
+cross-aggregate lookup the entity cannot perform on its own, which is
+why this is one of the few checks that legitimately lives in the use
+case rather than in the domain; calls `Project.create(...)`, which
+enforces R11 and sets the initial state per R12, so the use case never
+holds an invalid project in memory; and then saves and commits. The
+transaction covers the persistence of the project — nothing else.
 
+**After the commit: everything else is a reaction.**
+The use case publishes a single `ProjectPublished` event and terminates.
+A handler subscribed to that event then: loads the freelancer catalogue,
+ranks it through `IMatchingStrategy`, truncates the result to N,
+persists it as a ranking projection (R19, later read through the
+endpoint that satisfies R20); and, for each ranked freelancer, creates
+the notification required by R35 and refreshes that freelancer's
+suggested-projects view (R21, exposed by R22) by running the ranking in
+the opposite direction.
+
+**Validation lives in the domain, not in the use case.** The use case
+delegates rather than checks; the only conditions it evaluates itself
+are the ones that genuinely require a repository lookup (like the skill
+vocabulary check above).
+
+**The ranking always goes through the interface.** Neither the use case
+nor the handler knows which concrete strategy is active. That is the
+operational meaning of R26, and it's what turns the strategy comparison
+required by R44 into a configuration change rather than a code change.
+
+**Why the ranking is computed by the handler, and not by the use case.**
+This means the ranking computation happens *outside* the publication
+transaction, chosen for two reasons:
+
+1. **Robustness.** A failure in the matching computation can no longer
+   roll back a project that was correctly published. The project stays
+   in the catalogue, visible to manual search, and its ranking gets
+   recomputed on the next profile update that changes a freelancer's
+   eligibility (R23). This is exactly the "empty ranking" alternative
+   flow described in RASD scenario S2 — but here it falls out naturally
+   from the design, instead of needing to be coded as a special case.
+2. **Uniformity.** R19 (rank on publication) and R23 (recompute on
+   profile change) end up being the *same* code, triggered by two
+   different events — rather than one procedure living in a use case and
+   a near-duplicate of it living in a handler.
+
+**The trade-off.** The ranking is not included in the response to the
+publication request; the client has to read it separately, from the
+projection, through the endpoint defined by R20. Because event dispatch
+is synchronous (Sec. 2.3.3), the projection is already durably written
+by the time the publication response is sent — so this doesn't introduce
+staleness, only one extra HTTP request, comfortably within the two
+seconds NFR2 allows for a catalogue of the stated size.
 #### 2.3.2 S4 — Proposal acceptance
 
-Figure 5 shows the runtime interaction for the acceptance of a proposal (RASD scenario S4, requirements R11, R12, R13, R30, NFR6).
+Figure 7 shows the acceptance of a proposal (RASD scenario S4; requirements R15, R16, R17, R37, R41, R42).
 
-![Runtime view S4 — Figure 5](images/runtime_s4_acceptance.png)
+![Runtime view S4 — Figure 7](images/runtime_s4_acceptance.png)
 
-This is the flow where the transactional design decision lives, and the diagram makes its boundaries explicit. The atomic block of R12 starts when the use case loads the project together with its proposals, and ends with the single `projects.save(project)` commit. Inside the block, the entire decision logic is delegated to the domain: `Project.accept_proposal(proposal_id)` performs the FSM checks of RASD Sec. 3.2.1–3.2.2 and applies the three transitions (chosen proposal → `ACCEPTED`, every other pending proposal → `REJECTED`, project → `IN_PROGRESS`) on the in-memory aggregate. The repository then persists the aggregate in one commit: either all three transitions become visible, or none does (NFR6). Concurrent acceptance attempts are serialised at this commit point — the second transaction finds the project no longer `OPEN` and the domain check fails, which is the design-level realisation of the "concurrent acceptance" exception flow of RASD S4.
+This is the flow where the transactional decision lives, and the diagram makes its boundaries explicit.
 
-The `ProposalAccepted` event is published **after** the commit, never inside the transaction. This ordering rules out the failure mode in which freelancers receive acceptance or rejection notifications (R30) for a transition that was subsequently rolled back. The trade-off is the opposite, narrower failure mode — a crash between commit and publish would lose the notifications — which is acceptable for in-app notifications that the user can in any case derive from the dashboard state (R32).
+The atomic block of R16 opens when the use case loads the project **together with its proposals** — one call, not a project fetch followed by a proposal query — and closes with a single save and commit. Between the two, the use case performs exactly one authorisation check (R15: only the client owner may accept, which is also where the scoping of R42 is enforced for this operation) and hands the whole decision to the domain: `acceptProposal()` verifies that the project is still open, transitions the chosen proposal to accepted, every other pending proposal to rejected, and the project to inProgress. All three mutations happen on the in-memory aggregate; the repository then persists them in one commit. Either the three become visible together, or none does — which is what R16 asks for, and what DEP1 assumes of the store.
+
+Failure inside the block triggers an explicit rollback and a re-raise. Nothing is published on the way out, so the fan-out of R37 cannot fire for a transition that was undone.
+
+After the commit, `ProposalAccepted` is published, and the handler notifies the winner and every rejected freelancer (R37). The response returned to the owner carries the project identifier and its resulting state, as R41 requires of every state-changing request.
+
+
+The domain check `status == open` looks like it should be enough, but
+it isn't: two transactions can both read the project while it's still
+`open` and both pass the check, simply because neither one knows about
+the other yet.
+
+SQLAlchemy handles the concurrency check between two consecutive acceptances no extra logic needed in the use case.
+Whichever transaction commits first wins; the other one fails, and the
+use case rolls it back cleanly.
+
+The domain check still earns its place, just for a different scenario:
+if the losing client retries the request, the project now reads as
+`inProgress`, and the retry is rejected immediately.
+
+#### 2.3.3 The Observer dispatch
+
+The RASD introduces the propagation of publication side effects as "the reaction of an observer to the `ProjectPublished` event, anticipating the Observer contract that will be formalised in Deliverable 2". Figure 8 is that formalisation: how a handler comes to be called, and in which direction control flows when it is.
+
+![Runtime view: Observer dispatch — Figure 8](images/runtime_observer_dispatch.png)
+
+In **registration**, performed once per request by the composition root, a `UnitOfWork`, a bus and an `EventHandlers` bundle are constructed, and each handler is subscribed to the event type it handles. 
+
+In **dispatch**, a use case obtains events from an entity transition, commits, and publishes. The bus looks up the handlers registered for that event type and calls them in turn. Publishing an event with no subscribers is a no-op, so a use case may always publish without knowing whether anyone cares.
+
+This is an inversion of control, not a circular dependency, and the distinction is what makes the Open/Closed property of Sec. 2.4.3 real: adding an audit log for `ProposalAccepted` means writing a handler and adding one subscription in the composition root, with no edit to the acceptance use case, which is already tested code.
+
+ Dispatch is **synchronous**: a use case that returns has already had its notifications written, which is what makes the S2 projection durable before the response is emitted. And handlers **share the publisher's `UnitOfWork` but commit separately**: the transition is one transaction, the side effects another.
+
 
 ### 2.4 Selected architectural styles and patterns
 
-This section names the architectural style and the design patterns adopted, and for each of them explains *why* it was selected — i.e. which requirement or quality of the RASD it serves — and *how* it is realised in the components of Sec. 2.1–2.3. The three patterns below are the ones anticipated in the project proposal; the layered style is the frame that holds them together.
+Three design patterns and one architectural style carry this design. The style — a layered architecture with dependencies pointing inward — is the frame; the three patterns fill the seams the style opens. Each was chosen against a specific requirement of the RASD, and each is realised in a way that can be checked rather than asserted. Two of them, Strategy and Observer, are already named in the RASD (Sec. 3.1 and reference [5]) as contracts to be formalised here; the third, Repository, is anticipated by DEP1 and by reference [6].
 
-#### 2.4.1 Layered architecture (style)
+#### 2.4.1 Layered architecture
 
-**Which.** The system is organised in four layers — presentation, application, domain, infrastructure — with dependencies pointing inward towards the domain, as shown in the component view (Sec. 2.1) and enforced by the dependency rules of Sec. 2.1.7. The domain layer depends on nothing; the infrastructure implements interfaces declared for the inner layers' benefit.
+The system has six components, one per Python package: `api`,
+`application`, `matching`, `events`, `repositories`, `domain`. Every
+dependency points inward, towards the domain: `domain` depends on
+nothing; `repositories` implements interfaces.
 
-**Why.** Two reasons, both traceable to the RASD. First, the replaceability requirements: R20/NFR15 (matching strategy) and the data-store abstraction of Sec. 2.6.2/DEP1 both demand that a concrete mechanism can be swapped without touching the business logic, which is achievable only if the business logic does not reference concrete mechanisms in the first place. Second, testability: NFR-level conformance (in particular the invariants DOM1–DOM7 and the FSM transitions) must be verifiable by the test suite without a database or a web server, which requires a domain layer importable in isolation.
+The style is not chosen for its own sake. Two requirements make it close to mandatory.
 
-**How.** Each layer is one or more Python packages (`api`, `application`, `domain` + `matching` + `events`, `repositories`). The inward dependency rule is realised through three interfaces owned by the inner layers and implemented by the outer ones: `IRepository`, `IMatchingStrategy`, `IEventBus`. The concrete implementations are wired at application startup (composition root in `main.py`) and injected into the use cases; no module below the startup wiring imports a concrete implementation.
+The first is **replaceability**. R26 demands that the active matching
+strategy be substitutable by configuration, and DEP1 leaves the choice of
+data store open. This is directly enforced by the layered structure:
+each module's responsibility is confined to that module, and modules are
+decoupled from one another, communicating only through the interfaces
+they depend on rather than through concrete implementations. It is this
+confinement and decoupling that lets an implementation be swapped out
+without the rest of the system noticing.
 
-#### 2.4.2 Strategy — replaceable matching algorithm
+the second one is **Testability**. The lifecycle rules of RASD Sec. 2.4 and the FSM
+transitions of Sec. 3.2 must be verifiable with no database and no web
+server. The layering enforces exactly the precondition
+this requires: the domain must be fully decoupled from how its data is
+stored. 
 
-**Which.** The *Strategy* pattern applied to the matching procedure: the interface `MatchingStrategy` (Sec. 2.2.2) with two interchangeable implementations, `WeightedScoreStrategy` (default, the score model S(P,F) of R18 with the hard filters of R19) and `RuleBasedStrategy` (the sequential-criteria baseline).
+**Mechanism.** This decoupling is realised through interfaces:
+`application` and `domain` depend only on `IMatchingStrategy`,
+`IEventBus`, and `IRepository` — never on a concrete implementation — and
+communicate with the outer layers exclusively through them.
+ A single
+composition root is responsible for choosing which implementation to
+plug in: it reads the configuration to build the matching strategy, and
+assembles the UnitOfWork, the bus and the handlers for each request.
 
-**Why.** This is the direct realisation of goal G5 and of its requirement form R20/NFR15: the matching algorithm is the part of the system most likely to evolve — the project proposal itself plans a quality comparison between the two strategies (NFR16) — and the rest of the system must be insulated from that evolution. Without the pattern, every experiment on the ranking logic would risk regressions in project lifecycle, notifications and reviews.
 
-**How.** The use cases that need a ranking (`publish_project`, `manual_search`, the profile-update handlers) receive a `MatchingStrategy` instance through their constructor; the active implementation is chosen by a configuration key read at startup. The two ranking directions (G1: freelancers for a project; G2: projects for a freelancer) are two operations of the same interface, so a strategy is always coherent across both directions. Adding a third strategy consists of one new class implementing the interface plus one new value for the configuration key, no other file changes.
 
-#### 2.4.3 Observer — decoupled reaction to lifecycle events
+#### 2.4.2 Strategy — the matching algorithm
 
-**Which.** The *Observer* pattern, realised as an in-process event bus (`IEventBus`, Sec. 2.1.5): use cases publish typed domain events — `ProjectPublished`, `ProposalReceived`, `ProposalAccepted`, `CollaborationCompleted`, `ProfileUpdated` — and handlers registered at startup react to them.
+The matching procedure sits behind `MatchingStrategy` (Sec. 2.2.2): one
+interface with two operations, one per ranking direction, and two
+implementations.
 
-**Why.** The lifecycle transitions of the system have one-to-many side effects: a single acceptance (S4) must close the other proposals' lifecycle, notify the chosen freelancer and notify every rejected one (R30); a single publication (S2) must notify the ranked freelancers (R28) and refresh their suggested views (R16); a profile update must recompute rankings on both sides (R16, R17). Hard-wiring these effects into the use cases would make every new side effect a modification of tested code; the Observer inverts this, making new effects additive. The pattern is also what keeps the runtime view of Sec. 2.3 honest: the publisher terminates after `publish(event)` and genuinely does not know its subscribers.
+This directly realises R26. It also serves R44 independently: R44
+requires the system to expose the contact rate of suggested freelancers
+and the acceptance rate of suggested projects, and those numbers only
+mean something if two ranking approaches can be compared head to head —
+same system, same data, same test suite, with only the strategy class
+swapped at startup. 
 
-**How.** The event bus is a registry mapping event types to lists of handler callables, populated in the composition root. Events are plain immutable dataclasses produced *by the domain entities* as return values of their transition methods (Sec. 2.2.1) and published *by the use cases* strictly after the transaction commit (Sec. 2.3.2), which fixes the ordering guarantee discussed there. Handlers live in the `events` package and use the same repository interfaces as the use cases.
+Keeping the scoring algorithm outside the publication use case also
+protects the rest of the system on its own terms. If the algorithm were
+written directly inside `publish_project`, testing a new approach would
+mean editing the same code that also handles project validation and
+notification dispatch — turning a scoring experiment into a risk of
+regressions on lifecycle logic that has nothing to do with scoring.
 
-#### 2.4.4 Repository — data access decoupled from domain logic
+Two design choices in `MatchingStrategy` go beyond simple boilerplate:
 
-**Which.** The *Repository* pattern: one repository interface per aggregate (users, projects, proposals, reviews, notifications, skills) declared next to the domain, with two implementations — SQLAlchemy/SQLite for runtime, in-memory dictionaries for the test suite.
+The interface exposes **both ranking directions** as separate methods,
+rather than a single scoring function reused in both directions. Ranking
+freelancers for a project (G1) and ranking projects for a freelancer
+(G2) aren't mirror images of the same computation: they iterate over
+different candidate sets, apply different hard filters on different
+fields, and a future strategy might legitimately want to weigh them
+differently. Bundling both methods into one interface also has a second
+effect: it guarantees only one strategy object is active at a time, so
+a freelancer's ranking for a project and that project's presence in the
+freelancer's suggested list can never come from two different
+algorithms disagreeing with each other.
 
-**Why.** Anticipated in RASD Sec. 2.6.2/DEP1 for exactly the reason it is adopted here: the correctness of the matching and of the lifecycle logic must be verifiable against controlled, reproducible data sets. An in-memory implementation makes every domain and application test run in milliseconds with no setup; the SQLite implementation carries the transactional guarantees that the atomic block of R12 requires (NFR6). The pattern also implements constraint C2 of the layered style: the repository layer is the only code allowed to touch the database, so a future migration from SQLite to PostgreSQL is confined to one package and one connection string.
+And the strategies are **stateless**: their only fields are the two
+configuration value objects, and their operations are pure functions of
+their arguments. One instance is therefore built at startup and shared
+by every request and every handler, with no synchronisation. The weight
+validation runs at construction, so a configuration whose weights
+violate R24 fails at process start rather than at the first ranking of
+the first published project.
 
-**How.** Each repository interface exposes aggregate-oriented operations (`get`, `get_with_proposals`, `save`, `list_open`, …) rather than generic CRUD on rows: the unit of loading and saving is the aggregate that the domain methods operate on — e.g. `projects.get_with_proposals()` returns a `Project` together with its `Proposal`s precisely because `Project.accept_proposal()` needs to transition them together inside one atomic block (Sec. 2.3.2). The SQLAlchemy implementation maps the domain entities to tables; the mapping is kept in the `repositories` package so that the `domain` package remains free of ORM imports.
+Consumers receive the strategy through their constructor: the
+manual-search use case for the R29 ordering, the handler bundle for
+R19, R21 and R23. Adding a third strategy is one new class plus one new
+configuration value; no other file changes, and the test suite verifies
+this by running the same ranking scenario under both implementations
+through the interface alone.
+
+#### 2.4.3 Observer — reaction to lifecycle events
+
+Lifecycle transitions in this system have one-to-many side effects, and the fan-out is not incidental to the requirements — it *is* several of them. One acceptance must close the losing proposals' lifecycle and notify both the winner and every rejected freelancer (R37). One publication must rank the catalogue (R19), notify the ranked freelancers (R35) and refresh their suggested views (R21). One profile update must recompute rankings on both sides (R21, R23). Hard-wiring these into the use cases would make each new side effect an edit to already-tested code, and would leave the publication use case with four responsibilities and four reasons to change.
+
+The Observer pattern inverts this. Use cases publish typed events on `IEventBus` and terminate; handlers registered at startup react. Adding a side effect becomes additive — a new handler and one subscription — rather than a modification, which is the Open/Closed principle stated for this specific axis of change. The RASD already sketches the contract in its S2 sequence diagram; what follows is the part it deferred.
+
+**The events are produced by the domain, not by the use cases.** A transition operation returns the events it implies; the use case's job is only to publish what the entity handed it, after committing. This matters because the entity is the only object that knows what happened — which proposals it rejected, which freelancer won — and reconstructing that in the use case would mean either a second traversal or a duplicated rule. The domain nonetheless has no dependency on the bus: an event is an immutable dataclass declared in `domain`, and the bus that dispatches it lives one layer out.
+
+
+
+**Publication is strictly post-commit**, in every use case, without exception. Sec. 2.3.4 analyses the trade-off;
+
+
+**The bus itself is deliberately minimal**: a dictionary mapping event
+type to a list of callables, with `subscribe()` appending to a list and
+`publish()` looping over it. This simplicity is intentional — the value
+of the Observer pattern here is the *shape* of the dependency (use cases
+publish, handlers react, neither knows about the other directly), not
+the machinery implementing it. That shape is exactly what would survive
+a later move to asynchronous dispatch,
+changes are confined to the `IEventBus` implementation, invisible to any
+use case that publishes through it. 
+
+#### 2.4.4 Repository — data access decoupled from the domain
+
+Each aggregate has its own repository interface. `UnitOfWork` bundles
+all of them into a single transactional context. There are two
+implementations: one backed by SQLite, used at runtime, and one backed
+by plain in-memory data structures, used only by the tests.
+
+Three separate reasons justify having two implementations. First,
+correctness: the SQLite implementation must guarantee that a set of
+changes either all happen or none happen, which is what R16 requires.
+Second, replaceability: the domain code never names SQLite, or any
+database, directly — this is only possible because DEP1 leaves the
+choice of store open, and is what would let the store be swapped later
+without touching the domain. Third, testability: the in-memory
+implementation makes tests fast, with no database setup or cleanup, and
+the exact same test scenarios (S1 through S5) run against both
+implementations — if they ever behaved differently on the same input, a
+test would fail immediately, which is a stronger guarantee than reading
+the code carefully. 
+
+Each repository exposes exactly the methods a use case needs —
+`get_with_proposals`, `list_open`, `search_open` — rather than generic
+CRUD operations. A use case just calls these methods; it never has to
+know or care how they're implemented underneath, whether that's SQL
+queries against SQLite or a lookup in a plain Python dictionary. All of
+that translation lives entirely inside the repository, behind the
+interface — which is exactly what makes swapping the SQLite
+implementation for the in-memory one, or for a different database
+later, invisible to every use case that depends on it.
+
+
+
 ## 3. User Interface Design
 
 ### 3.1 Approach: API-first delivery
 
-The system is delivered API-first, consistently with constraint C1 of the RASD (web application, no native clients) and with the prototype scope of Deliverable 3. The user-facing surface of this iteration is the REST API itself, operated through the **OpenAPI (Swagger) console** that FastAPI generates automatically from the endpoint definitions and serves at the `/docs` path.
+The system is delivered API-first, consistently with constraint C1 of the RASD (web application, no native clients) and with the prototype scope of Deliverable 3 (SE4A-project guideline 5.3: a viable prototype privileging stability over feature breadth). The user-facing surface of this iteration is the REST API itself, operated through the **OpenAPI (Swagger) console** that FastAPI generates automatically from the endpoint definitions and serves at the `/docs` path.
 
-This choice is a deliberate allocation of effort, not an omission. The interesting engineering content of FreelanceMatch — the matching strategies, the lifecycle invariants, the event-driven side effects — lives entirely behind the API boundary; a custom graphical frontend would exercise none of it and would consume a significant share of the implementation budget. The OpenAPI console, by contrast, costs zero implementation effort and provides everything the demonstration and the evaluation need: every endpoint is listed with its request/response schemas, can be invoked interactively from the browser, and displays the actual responses of the running system. A custom frontend remains a natural extension and would interact with the very same API, with no server-side change.
+This choice is a deliberate allocation of effort, not an omission. The interesting engineering content of FreelanceMatch — the matching strategies, the lifecycle rules, the event-driven side effects — lives entirely behind the API boundary; a custom graphical frontend would exercise none of it and would consume a significant share of the implementation budget. The OpenAPI console, by contrast, costs zero implementation effort and provides everything the demonstration and the evaluation need: every endpoint is listed with its request/response schemas, can be invoked interactively from the browser, and displays the actual responses of the running system. It also gives NFR6 a fair test, since a new user completes registration and profile setup by filling the documented schemas, with no external assistance. A custom frontend remains a natural extension and would interact with the very same API, with no server-side change.
 
 ### 3.2 Structure of the interface
 
-The console groups the endpoints by tag; tags correspond one-to-one to the requirement clusters of RASD Sec. 2.4, so that the interface itself mirrors the structure of the requirements:
+The console groups the endpoints by tag; tags correspond one-to-one to the requirement clusters of RASD Sec. 2.4, so that the interface itself mirrors the structure of the requirements and of the traceability matrix of Sec. 4:
 
 | Tag | Endpoints (main) | Requirements cluster |
 |---|---|---|
-| **accounts** | `POST /users` (register), `POST /login`, `GET/PUT /users/me` (profile), `GET /skills`, `POST /skills/requests` | R1–R6 |
-| **projects** | `POST /projects`, `GET /projects/{id}`, `POST /projects/{id}/complete` | R7, R8, R14 |
-| **proposals** | `POST /projects/{id}/proposals`, `POST /projects/{id}/proposals/{pid}/accept` | R9–R13 |
-| **matching** | `GET /projects/{id}/ranking`, `GET /users/me/suggested-projects` | R15–R20 |
-| **search** | `GET /search/freelancers`, `GET /search/projects` | R21–R23 |
-| **reviews** | `POST /projects/{id}/reviews` | R24–R27 |
-| **notifications** | `GET /users/me/notifications`, `GET /users/me/dashboard` | R28–R32 |
-| **metrics** | `GET /metrics/matching` | NFR16 |
+| **accounts** | `POST /users` (register), `GET/PUT /users/me` (profile), `POST /skills/requests` | R1–R10 |
+| **projects** | `POST /projects`, `GET /projects/{id}`, `PUT /projects/{id}`, `POST /projects/{id}/complete` | R11, R12, R18, R45 |
+| **proposals** | `POST /projects/{id}/proposals`, `POST /projects/{id}/proposals/{pid}/accept` | R13–R17 |
+| **matching** | `GET /projects/{id}/ranking`, `GET /users/me/suggested-projects` | R19–R26 |
+| **search** | `GET /search/freelancers`, `GET /search/projects` | R27–R29 |
+| **reviews** | `POST /projects/{id}/reviews` | R30–R34 |
+| **notifications** | `GET /users/me/notifications`, `GET /users/me/dashboard` | R35–R40 |
+| **account data** | `GET /users/me/data`| R43 |
+| **metrics** | `GET /metrics/matching` | R44 |
 
-The table lists the main endpoints per cluster; the complete and authoritative list is the auto-generated OpenAPI console.
 ### 3.3 Interaction conventions
 
-The conventions below realise, at the API level, the usability requirements stated for the interface in the RASD:
+The conventions below realise, at the API level, the cross-cutting requirements R41–R44 of the RASD:
 
-- **Explicit outcome feedback (NFR9).** Every state-changing endpoint returns the affected entity with its new state in the response body (e.g. accepting a proposal returns the project with `status = IN_PROGRESS` and the proposal with `status = ACCEPTED`), so the caller always observes the outcome of the action.
-- **Errors as structured responses.** Domain errors (FSM violations, invariant violations DOM1–DOM7, validation failures) are translated by the API Gateway into HTTP `409 Conflict` or `422 Unprocessable Entity` with a machine-readable body `{ "error": <code>, "detail": <message> }`; the error codes reuse the invariant identifiers (e.g. `DOM1_DUPLICATE_PROPOSAL`), keeping the vocabulary of the documents and of the running system aligned (NFR10).
-- **Identity.** For the prototype, the authenticated user is conveyed by a session token obtained from `POST /login`; endpoints under `/users/me/...` resolve the identity from the token (NFR14).
+- **Explicit outcome feedback (R41).** Every state-changing endpoint returns the identifier of the affected entity together with its resulting state (e.g. accepting a proposal returns the project with `status = inProgress`), so the caller always observes the outcome of the action without a follow-up read.
+- **Errors as structured responses.** Domain errors — illegal FSM transitions, violated lifecycle rules, validation failures — are translated by the API Gateway into HTTP `409 Conflict` or `422 Unprocessable Entity` with a machine-readable body `{ "error": <code>, "detail": <message> }`. The error codes name the rule that was violated (e.g. `DUPLICATE_PROPOSAL` for R14, `PROJECT_NOT_OPEN` for R17), keeping the vocabulary of the documents and of the running system aligned.
+- **Identity and scoping (R42).** The authenticated user is conveyed by a session token obtained from `POST /login`; endpoints under `/users/me/...` resolve the identity from the token, and every use case that touches another entity receives the resolved identity as its actor argument, so a request targeting data owned by a different user is refused rather than filtered.
 
 ### 3.4 Walkthrough of the demonstration flow
 
-The demonstration of the system follows the scenario chain S1→S5 of the RASD directly on the console: register a client and a freelancer (S1), publish a project and inspect the returned ranking (S2), submit a proposal as the freelancer (S3), accept it as the client and observe the cascading state changes (S4), complete the project and exchange reviews, observing the reputation update (S5). A seed script (Sec. 5) pre-populates the database with a realistic catalogue of skills and freelancers so that the rankings computed during the demonstration are meaningful.
+The demonstration follows the scenario chain S1→S5 of the RASD directly on the console: register a client and a freelancer (S1); publish a project and then read its ranking from `GET /projects/{id}/ranking` (S2 — the ranking is computed by an event handler after the publication commits, as Sec. 2.3.1 explains, and is therefore retrieved rather than returned); submit a proposal as the freelancer (S3); accept it as the client and observe the cascading state changes in the response and in the freelancers' notifications (S4); complete the project and exchange reviews, observing the reputation update (S5). A seed script (Sec. 5) pre-populates the database with a realistic catalogue of skills and freelancers so that the rankings computed during the demonstration are meaningful.
 ## 4. Requirements Traceability
 
-This section maps the functional requirements R1–R32 of the RASD onto the design elements introduced in Section 2, extending the traceability matrix of RASD Sec. 2.4.7 with the design columns. For each requirement, the matrix indicates the use case (application module) that orchestrates it and the design element — component, class or method — that realises its core logic. The non-functional requirements with a direct design counterpart are traced in the closing paragraph.
+This section maps the functional requirements R1–R45 of the RASD onto the design elements introduced in Section 2, extending the traceability matrix of RASD Sec. 2.4.8 — which relates each requirement to its goals, scenarios and shared phenomena — with a design column. For each requirement the matrix indicates the use case (application module) that orchestrates it, where one exists, and the design element that realises its core logic. Requirements realised by an event handler rather than by a use case are marked as such, since that displacement is itself a design decision (Sec. 2.3.1); requirements with no orchestration at all are pure structure, realised by an entity, an interface or a repository operation.
 
-| Req. | Use case (application) | Design element (component — class/method) |
-|------|------------------------|--------------------------------------------|
-| R1   | `register_user` | `domain — User` subclass creation; `api — POST /users` |
-| R2   | `register_user` | `repositories — UserRepository.exists_by_email()` |
-| R3   | `register_user` / profile update | `domain — Client` profile fields |
-| R4   | `register_user` / profile update | `domain — Freelancer.declare_competence()`, `add_availability()` |
-| R5   | profile update | `repositories — UserRepository.save()`; `events — ProfileUpdated` |
-| R6   | `register_user` | `domain — Skill` catalogue; `repositories — SkillRepository` |
-| R7   | `publish_project` | `domain — Project.create()` validation |
-| R8   | `publish_project` | `domain — Project.create()` → `status = OPEN` |
-| R9   | `submit_proposal` | `domain — Project.can_receive_proposals()` |
-| R10  | `submit_proposal` | `repositories — ProposalRepository` uniqueness check (DOM1) |
-| R11  | `accept_proposal` | `domain — Project.accept_proposal()` precondition |
-| R12  | `accept_proposal` | `domain — Project.accept_proposal()` inside the transactional block (Sec. 2.3.2) |
-| R13  | `submit_proposal` | `domain — Project.can_receive_proposals()` (status ≠ OPEN → refuse) |
-| R14  | `complete_and_review` | `domain — Project.mark_completed()` |
-| R15  | `publish_project` | `matching — MatchingStrategy.rank_freelancers()` |
-| R16  | events handler | `events — on_profile_updated` → `rank_projects()` |
-| R17  | events handler | `events — on_profile_updated` → recompute open-project rankings |
-| R18  | — | `matching — WeightedScoreStrategy.compute_score()` + sub-score methods |
-| R19  | — | `matching — WeightedScoreStrategy` hard-filter pre-pass |
-| R20  | all ranking call sites | `matching — MatchingStrategy` interface + startup wiring (Sec. 2.4.2) |
-| R21  | `manual_search` | `repositories — UserRepository.search()`; `api — GET /search/freelancers` |
-| R22  | `manual_search` | `repositories — ProjectRepository.search()`; `api — GET /search/projects` |
-| R23  | `manual_search` | ordering parameter resolved in `manual_search` |
-| R24  | `complete_and_review` | `events — on_collaboration_completed` opens review window |
-| R25  | `complete_and_review` | `domain — Review` creation rules (DOM5, DOM6) |
-| R26  | `complete_and_review` | `domain — Review` immutability (no update method exists) |
-| R27  | `complete_and_review` | `domain — User.update_reputation()`; `events — on_review_submitted` |
-| R28  | events handler | `events — on_project_published` → notifications |
-| R29  | events handler | `events — on_proposal_received` → notification to owner |
-| R30  | events handler | `events — on_proposal_accepted` → accepted/rejected notifications |
-| R31  | events handler | `events — on_collaboration_completed` → review-window notifications |
-| R32  | dashboard query | `api — GET /users/me/dashboard`; `repositories` read queries |
+### 4.1 Functional requirements
 
-Beyond the functional requirements, the design directly realises the following non-functional ones. **NFR6** (atomic transitions) is realised by the transactional boundary drawn in the `accept_proposal` use case around the aggregate commit (Sec. 2.3.2). **NFR15** (strategy replaceability) is realised by the `MatchingStrategy` interface and the startup wiring (Sec. 2.4.2) and verified mechanically by the swap test of Sec. 5. **NFR16** (matching quality metrics) is realised by the `RuleBasedStrategy` baseline plus the event handlers, which record ranking exposures and proposal outcomes as they react to the lifecycle events. **NFR11–NFR14** (security) are confined to the `api` component (password hashing at registration, session resolution, per-user data scoping in the `/users/me/...` endpoints), consistently with the layering: no security concern leaks below the presentation layer.
+| Req. | Use case / handler | Design element (component — class/operation) |
+|------|--------------------|---------------------------------------------|
+| R1  | `register_user` | `domain — User` subclass creation; `api — POST /users` |
+| R2  | `register_user` | `repositories — IUserRepository.existsByEmail()` |
+| R3  | `register_user` | `api — DTO validation`; `domain — ValidationError` |
+| R4  | `update_profile` | `domain — Client` profile attributes |
+| R5  | `update_profile` | `domain — Freelancer.declareCompetence()`, `addAvailability()` |
+| R6  | `update_profile` | `repositories — IUserRepository.save()`; `events — ProfileUpdated` |
+| R7  | all state-changing use cases | `repositories — UnitOfWork.commit()` before the response (Sec. 2.1.2, step 3) |
+| R8  | — | `domain — Skill` catalogue; `repositories — ISkillRepository` |
+| R9  | `update_profile`, `publish_project` | vocabulary check against `ISkillRepository` (Sec. 2.3.1) |
+| R10 | `request_skill` | `domain — SkillRequest`; `repositories — ISkillRepository.saveRequest()` |
+| R11 | `publish_project` | `domain — Project.create()` validation |
+| R12 | `publish_project` | `domain — Project.create()` → `status = open` |
+| R13 | `submit_proposal` | `domain — Project.canReceiveProposals()` |
+| R14 | `submit_proposal` | `domain — Project.addProposal()` (duplicate check inside the aggregate) |
+| R15 | `accept_proposal` | `domain — Project.acceptProposal()` precondition; owner check in the use case |
+| R16 | `accept_proposal` | transactional block around the aggregate commit + optimistic lock (Sec. 2.3.2) |
+| R17 | `submit_proposal`, `accept_proposal` | `domain — Project.canReceiveProposals()` (status ≠ open → refuse) |
+| R18 | `complete_and_review` | `domain — Project.markCompleted()` |
+| R19 | handler `on_project_published` | `matching — MatchingStrategy.rankFreelancers()`; `repositories — IRankingRepository` |
+| R20 | — | `api — GET /projects/{id}/ranking` over the persisted projection |
+| R21 | handler `on_profile_updated` | `matching — MatchingStrategy.rankProjects()` |
+| R22 | — | `api — GET /users/me/suggested-projects` over the persisted projection |
+| R23 | handler `on_profile_updated` | recomputation of the rankings of the affected open projects |
+| R24 | — | `matching — WeightedScoreStrategy.computeScore()` + sub-scores; `MatchingWeights.validate()` |
+| R25 | — | `matching — WeightedScoreStrategy.passesHardFilters()` (pre-pass, before scoring) |
+| R26 | all ranking call sites | `matching — MatchingStrategy` interface + composition root (Sec. 2.4.2) |
+| R27 | `manual_search` | `repositories — IUserRepository.searchFreelancers()`; `api — GET /search/freelancers` |
+| R28 | `manual_search` | `repositories — IProjectRepository.searchOpen()`; `api — GET /search/projects` |
+| R29 | `manual_search` | ordering parameter resolved in the use case; score ordering via `MatchingStrategy` |
+| R30 | handler `on_collaboration_completed` | opens the review window for both parties |
+| R31 | `complete_and_review` | `domain — Review.create()` (completed project, parties only, one per author) |
+| R32 | — | `domain — Review`: no update operation exists (Sec. 2.2.1) |
+| R33 | `complete_and_review` | `domain — User.updateReputation()`, inside the review transaction |
+| R34 | `complete_and_review` | stored reputation, committed with the review (Sec. 2.2.1) |
+| R35 | handler `on_project_published` | notification to every freelancer in the ranking |
+| R36 | handler `on_proposal_received` | notification to the project owner |
+| R37 | handler `on_proposal_accepted` | accepted / rejected notifications (fan-out) |
+| R38 | handler `on_collaboration_completed` | review-window notifications to both parties |
+| R39 | — | `api — GET /users/me/dashboard`; `repositories` read queries |
+| R40 | — | same endpoint; stored `User.reputation` |
+| R41 | all state-changing use cases | `api — DTO` carrying identifier and resulting state (Sec. 3.3) |
+| R42 | all use cases | authenticated principal passed as the actor argument; owner checks (Sec. 2.1.1) |
+| R43 | — | `api — GET /users/me/data`; `repositories` read queries |
+| R44 | handlers (recording) | `repositories — IMetricsRepository`; `api — GET /metrics/matching` |
+| R45 | `update_project` | `domain — Project.updateMetadata()` (legal only while open) |
 
-The remaining mappings of requirements to goals, scenarios, shared phenomena and domain invariants are unchanged from RASD Sec. 2.4.7 and are not duplicated here.
+
 ## 5. Implementation, Integration and Test Plan
 
 This section defines the order in which the components of Sec. 2.1 will be implemented, the order in which they will be integrated, and the strategy for testing each increment. The plan follows a bottom-up order along the dependency direction of the layered architecture: components are implemented starting from the ones that depend on nothing, so that every increment is testable the moment it is written, without stubs for lower layers.
 
 ### 5.1 Implementation order
 
-The implementation proceeds in five increments. Each increment ends with a working, tested state of the repository — never with code that compiles but cannot be exercised.
+The implementation proceeds in five increments. 
 
 **Increment 1 — Domain (`domain`).**
-The entities, enumerations and transition methods of Sec. 2.2.1, with the invariants DOM1–DOM7 enforced inside the entities. This increment has no dependency and is implemented first precisely because everything else depends on it. Includes the `DomainEvent` dataclasses returned by the transition methods.
+Implements entities, enumerations, events, errors. This increment has no dependency and is implemented first precisely because everything else depends on it. 
+
 *Exit criterion:* the unit-test suite over the domain passes (Sec. 5.3, T1–T2); the FSMs of RASD Sec. 3.2 are fully covered, legal and illegal transitions alike.
 
 **Increment 2 — Matching (`matching`) and in-memory repositories.**
 The `MatchingStrategy` interface with both implementations (Sec. 2.2.2), plus the in-memory implementation of the repository interfaces. The in-memory repositories are implemented *before* the SQL ones because they unblock the testing of everything above the domain at negligible cost.
+
 *Exit criterion:* T3–T4 pass; the two strategies produce correct and distinct rankings on a controlled catalogue.
 
 **Increment 3 — Application layer (`application`) and event bus (`events`).**
-The six use cases in the order of their scenario dependencies: `register_user` (S1), `publish_project` (S2), `submit_proposal` (S3), `accept_proposal` (S4), `complete_and_review` (S5), `manual_search` (S6, lowest priority — declared nice-to-have and cut first if the schedule demands it). The event bus and the handlers are implemented together with `publish_project`, which is the first use case that needs them.
+The use cases in the order of their scenario dependencies: `register_user` (S1), `publish_project` (S2), `submit_proposal` (S3), `accept_proposal` (S4), `complete_and_review` (S5), `manual_search` (S6). The event bus is implemented in the same increment, since `application` imports it directly.
+
 *Exit criterion:* T5–T6 pass; the full chain S1→S5 runs as a plain Python script against the in-memory repositories.
 
 **Increment 4 — Persistence (`repositories`/SQLAlchemy) and composition root.**
-The SQLite implementation of the repository interfaces, the ORM mapping, and the startup wiring (`main.py`) that selects the active matching strategy and registers the event handlers.
+The SQLite implementation of the repository interfaces, the ORM, and the startup wiring that selects the active matching strategy and registers the event handlers.
+
 *Exit criterion:* T7 passes; the same S1→S5 script of increment 3 runs unmodified against SQLite — the strongest possible evidence that the Repository abstraction holds.
 
 **Increment 5 — API (`api`), seed data, packaging.**
-The REST endpoints of Sec. 3.2 (thin translation to use cases), the error mapping of Sec. 3.3, the seed script, the installation instructions. This is last because it adds no logic: every behaviour it exposes already exists and is already tested.
+The REST endpoints of Sec. 3.2 (thin translation to use cases), the error mapping and response conventions of Sec. 3.3, the seed script, the installation instructions. This is last because it adds no logic: every behaviour it exposes already exists and is already tested.
+
 *Exit criterion:* T8 passes; the demonstration walkthrough of Sec. 3.4 can be executed end-to-end on the Swagger console after a fresh clone-and-install.
 
 ### 5.2 Integration order
 
-Integration follows the increments: each increment integrates with the already-tested stack below it, so there is no "big-bang" integration phase. The two integration points that deserve explicit attention are:
+Integration follows the increments: each increment integrates with the already-tested stack below it. The two integration points that deserve explicit attention are:
 
-1. **Application ↔ Persistence (increment 4).** The switch from in-memory to SQLite repositories is the moment when the transactional semantics of NFR6 becomes real. The integration test T7 exercises the atomic block of `accept_proposal` against SQLite specifically, including the concurrent-acceptance race (two acceptances of different proposals on the same project: exactly one must succeed).
-2. **API ↔ Application (increment 5).** Verified by end-to-end tests that drive the HTTP interface (FastAPI's test client) through the S1→S5 chain and assert on the HTTP-level contract: status codes, error bodies with DOM-coded errors, state visible in responses (NFR9).
+1. **Application ↔ Persistence (increment 4).** The switch from in-memory to SQLite repositories is the moment when the atomicity demanded by R16 becomes real, on the store DEP1 assumes. The integration test T7 exercises the atomic block of `accept_proposal` against SQLite specifically, including the concurrent-acceptance race (two acceptances of different proposals on the same project: exactly one must succeed).
+2. **API ↔ Application (increment 5).** Verified by end-to-end tests that drive the HTTP interface (FastAPI's test client) through the S1→S5 chain and assert on the HTTP-level contract: status codes, structured error bodies, and the identifier-plus-resulting-state responses required by R41.
 
 ### 5.3 Test plan
 
-Testing is organised in three levels — unit (domain, matching), integration (use cases against both repository implementations), end-to-end (HTTP) — with the suite below as the committed minimum. Tests are written together with the increment they verify, not deferred to the end.
+Testing follows the two complementary strategies of the V-model (RASD/course
+notation): **white-box (structural) testing**, where test cases are selected
+from the internal structure of the code and their adequacy is judged by
+structural coverage, and **black-box (functional) testing**, where test cases
+are derived from the specification — the scenarios S1–S7, the finite state
+machines of RASD Sec. 3.2, or the HTTP contract of Sec. 3 — with no reference to
+the internals of the code under test. The two are complementary: white-box
+testing checks *what the code does* and exposes defects in the paths that
+exist, but cannot reveal a missing path with respect to the specification;
+black-box testing checks *what the code is supposed to do* and catches such
+omissions.
+
+The distinction that organises T1–T8 is **how each test's cases were selected**,
+which is independent of the level at which the test executes. T1 and T2 run at
+the unit level and are white-box in the strict sense: every case comes from
+reading the entities' code — one case per guard clause, one case per edge of
+the FSM. T3 and T4 also run at the unit level (no I/O, isolated), but their
+cases come from the *specification* of the matching algorithm (R24–R26), not
+from its control flow — they are unit tests with a black-box, functional
+oracle. T5–T8 are black-box throughout, at increasing scope (integration, then
+end-to-end): their cases come from the scenarios S1–S7 and the HTTP contract,
+and the components under test are driven only through their public interface.
 
 | Id | Level | What it verifies | Traces to |
 |----|-------|------------------|-----------|
-| T1 | unit | Every invariant DOM1–DOM7: one test per invariant attempting the violation and expecting `DomainError` | RASD Sec. 2.2 |
-| T2 | unit | FSM transition coverage for `Project` and `Proposal`: all legal transitions succeed, all illegal ones fail | RASD Sec. 3.2; R8–R14 |
-| T3 | unit | `WeightedScoreStrategy`: sub-scores normalised in [0,1], weights validated, hard filters exclude before scoring, known catalogue → known ranking | R18, R19 |
-| T4 | unit | Strategy swap: identical input through both strategies yields valid but distinct rankings; active strategy switchable by configuration alone | R20, NFR15, G5 |
-| T5 | integration | Use-case chain S1→S5 on in-memory repositories: full lifecycle with assertions on intermediate states and emitted events | S1–S5; R1–R31 |
-| T6 | integration | Observer effects: `ProjectPublished` produces notifications + suggested-view refresh; `ProposalAccepted` produces accepted/rejected notifications; handlers receive events only after commit | R16, R28–R31 |
-| T7 | integration | Atomic acceptance on SQLite: cascade correctness and concurrent-acceptance race (exactly one winner) | R12, DOM2, DOM3, NFR6 |
-| T8 | end-to-end | HTTP walkthrough of Sec. 3.4 via test client: status codes, DOM-coded error bodies, per-user data scoping | NFR9, NFR10, NFR14 |
+| T1 | unit | Every domain rule enforced by an entity: one test per rule attempting the violation and expecting the coded `DomainError` | R14, R16, R18, R31, R33 |
+| T2 | unit | FSM transition coverage for `Project` and `Proposal`: all legal transitions succeed, all illegal ones fail, including the entry guards and the metadata self-transition | RASD Sec. 3.2; R11–R13, R15–R18, R45 |
+| T3 | unit | `WeightedScoreStrategy`: sub-scores normalised in [0,1], weights validated, hard filters exclude before scoring, known catalogue → known ranking | R24, R25 |
+| T4 | unit | Strategy swap: identical input through both strategies yields valid but distinct rankings; active strategy switchable by configuration alone | R26 |
+| T5 | integration | Use-case chain S1→S5 on in-memory repositories, plus manual search (S6) and a project metadata edit (S7) | S1–S7; R1–R18, R30–R34, R45 |
+| T6 | integration | Observer effects: `ProjectPublished` produces notifications + suggested-view refresh; `ProposalAccepted` produces accepted/rejected notifications; handlers receive events only after commit; matching-quality counters are accumulated | R19, R21, R23, R35–R38, R44 |
+| T7 | integration | Atomic acceptance on SQLite: cascade correctness, the concurrent-acceptance race resolved by the optimistic lock, and persistence of a project metadata edit (S7) across sessions | R15, R16, R17, R45; DEP1 |
+| T8 | end-to-end | HTTP walkthrough of Sec. 3.4, plus the S7 edit endpoint: status codes, structured error bodies, identifier-plus-state responses, per-user data scoping | R41, R42, R45 |
+
+#### 5.3.1 White-box testing — T1, T2
+
+T1 and T2 target the two aggregates whose logic must never be bypassed —
+`Project` and `Proposal` — and their cases are selected from the internal
+structure of the entities: one case per guard clause (T1) and one case per edge
+of the FSM (T2).
+
+**T1 — domain rules.** One test per rule enforced inside the entities, each
+attempting the violation and expecting the corresponding coded `DomainError`:
+no two proposals from the same freelancer on the same project
+(`R14_DUPLICATE_PROPOSAL`), at most one accepted proposal per project and the
+atomic cascade that follows an acceptance (`R16`), completion only from
+`inProgress` (`R18_NOT_IN_PROGRESS`), reviews only for a completed project and
+only between its two parties (`R31_PROJECT_NOT_COMPLETED`,
+`R31_AUTHOR_NOT_PARTY`), at most one review per author (`R31_DUPLICATE_REVIEW`),
+and reputation as a normalised function of the received reviews (`R33`).
+
+**T2 — FSM transition coverage.** For the `Project` and `Proposal` state
+machines of RASD Sec. 3.2, every *legal* transition is driven and asserted to
+produce the expected target state and domain event, and every *illegal*
+transition is asserted to raise `IllegalTransition`. This includes the creation
+guards of the entry transition (`R11`/`R12`: a valid project is born `open`; an
+empty title, empty description, empty skill set, negative budget or past
+deadline is each rejected with its own code), the metadata self-transition
+allowed only while `open` (`R45`, S7), the refusal of proposals after the
+deadline or on a non-open project (`R13`/`R17`), and the finality of both
+terminal proposal states.
+
+**Coverage as the adequacy criterion.** Because T1–T2 are structural by
+construction, branch coverage is the right way to judge whether they are
+sufficient.
+
+Measured with `coverage.py` (`--cov-branch`) over `app.domain`, running
+only T1 and T2 (`test_t1_t2_domain.py`, 17 tests): `entities.py` is at
+**88%**. The uncovered lines are out of scope by construction: none of this code has a domain rule or an
+FSM to test against. `Skill`, `SkillRequest`, `Availability`, and
+`register_user` only validate input format at creation — not invariants
+protecting an aggregate across a transition — and `Notification` has no
+lifecycle at all. T1/T2 have no criterion that would generate a case for
+any of them.
+
+#### 5.3.2 Black-box testing — T3–T8
+
+**T3 — weighted scoring.** The `WeightedScoreStrategy` is exercised against its
+specification (`R24`, `R25`): the four sub-scores are checked to be normalised
+in [0,1] across their edge cases (zero rate, zero budget, overrun within and
+beyond the tolerance, a project past its deadline), the weights are validated to
+sum to one, the hard filters are shown to exclude a candidate *before* any score
+is computed, and a controlled catalogue is asserted to produce a known ranking
+— an oracle taken from what the algorithm is supposed to compute.
+
+**T4 — strategy substitutability.** The same input, passed through both the
+weighted and the rule-based strategy, is shown to yield valid but distinct
+rankings, and the active strategy is shown to be switchable by configuration
+alone with no code change (`R26`, G5).
+
+**T5 — use-case chain (integration, in-memory).** The scenarios S1→S5 are driven
+end to end over the in-memory repository stack: registration and profiles,
+publication with automatic ranking, proposals, atomic acceptance with cascade
+rejection, completion and mutual reviews. The test asserts on the intermediate
+states, on the reputations propagated by the reviews, and on the emitted domain
+events (S1–S5; R1–R38). Manual search (S6) and a project metadata edit (S7) are
+each exercised separately in the same file, as both stand outside the S1→S5
+chain: S6 has no state to assert on beyond the search result itself, and S7 —
+like S6 — emits no domain event, so it has nothing to contribute to the T6
+observer tests below.
+
+**T6 — observer effects (integration).** The reaction of the event handlers is
+verified against the specification of the notifications and metrics: publication
+produces a "new compatible project" notification and refreshes the suggested-
+projects view (R21, R35), each proposal notifies the owner (R36), acceptance
+fans out accepted/rejected notifications (R37), completion opens the review
+window (R38), and the matching metrics are accumulated (R44). A dedicated probe
+confirms that handlers observe an event only *after* the commit, never inside the
+transaction (DD Sec. 2.3.2). S7 is deliberately absent from this test: `update_project`
+is a self-transition with no side effect on any other aggregate, so it publishes
+no event for a handler to react to (DD Sec. 2.1.2).
+
+**T7 — persistence, concurrency and atomicity (integration, SQLite).** The same
+S1→S5 driver of T5 is re-run *unchanged* on the SQLAlchemy stack, which is the
+strongest evidence that the repository abstraction holds. To verify data
+persistence, a project is created, taken through acceptance, and saved to the
+database; a fresh session is then attached to read it back, since only a new
+one is forced to query the database rather than return what it already holds
+in memory. The same property is checked for S7 on its own: a project's title
+is edited, and a fresh session confirms the new title — and the untouched
+description — are really on disk.
+
+Two further tests target the atomic acceptance block (`R16`). The first
+re-reads the project after acceptance and shows all three transitions —
+proposal accepted, other proposals rejected, project `inProgress` — landing
+together in a single commit, never partially. The second has two independent
+sessions each accept a different proposal on the same open project;
+SQLAlchemy's own logic ensures the race is serialised, so exactly one commit
+succeeds and the other raises (DEP1 transactional store).
+
+**T8 — end-to-end (HTTP).** The walkthrough of Sec. 3.4 drives the system entirely through the
+FastAPI test client, checking the three things the API boundary is
+responsible for. HTTP status codes are correct for each outcome. Error
+bodies carry the requirement/transition code that produced them — a
+duplicate proposal, for instance, returns 409 with an `error` field
+starting with `R14`. And scoping/authorisation is enforced per user: no
+token returns 401, the wrong role returns 403, a non-owner reading
+another client's ranking gets `NOT_OWNER`, and the dashboard only ever
+shows data belonging to the authenticated principal (R41, R42). S7 is
+exercised the same way, over `PUT /projects/{id}`: a legal edit by the owner
+returns 200 with the updated fields and the status unchanged; a non-owner
+gets 422 `NOT_OWNER`; and, once the project has moved past `open` through an
+accepted proposal, the same owner's edit is refused with 409
+`PROJECT_NOT_OPEN`.
+
+
+
+
+
+## 6. References
+
+- **[1]** E. Gamma, R. Helm, R. Johnson, J. Vlissides, *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley, 1994. 
+- **[2]** M. Fowler, *Patterns of Enterprise Application Architecture*. Addison-Wesley, 2002.
+- **[3]** Object Management Group, *OMG Unified Modeling Language (OMG UML), Version 2.5.1*, formal/2017-12-05, 2017. Available: https://www.omg.org/spec/UML/2.5.1 
+- **[4]** PlantUML Reference Guide. Available: https://plantuml.com.
+- **[5]** FastAPI documentation. Available: https://fastapi.tiangolo.com 
+- **[6]** SQLAlchemy documentation. Available: https://www.sqlalchemy.org
+- **[7]** FreelanceMatch group, *Requirements Analysis and Specification Document*.
+- **[8]** M. Camilli, *Software Engineering for Automation — Project Guideline, A.Y. 2024-2025*. Politecnico di Milano, 2024. 
