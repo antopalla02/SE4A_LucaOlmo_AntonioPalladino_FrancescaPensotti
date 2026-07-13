@@ -50,7 +50,7 @@ The main goals of the project, stated in full in RASD Sec. 1.1, are recalled her
 - **G4** — reputation derived from mutual reviews, fed back into the matching;
 - **G5** — manual search, so that both parties can look for a counterpart and decide independently of the suggested ranking.
 
-The design presented here is organised around four decisions, each anticipated in the RASD and motivated in Sec. 2.4 of this document:
+The design presented here is organised around three decisions, each anticipated in the RASD and motivated in Sec. 2.4 of this document:
 
 - a *Strategy* interface that isolates the matching algorithm, so that the active strategy is substitutable by configuration (R26) and two strategies can be compared through the metrics of R44;
 - an *Observer*-based event mechanism that decouples lifecycle transitions from their side effects — notifications (R35–R38) and ranking recomputation (R19, R21, R23);
