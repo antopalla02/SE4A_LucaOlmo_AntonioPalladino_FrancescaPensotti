@@ -15,9 +15,10 @@ Software Engineering for Automation — A.Y. 2025-2026
 | | |
 |---|---|
 | **Authors** | Olmo Luca (10838404), Palladino Antonio (10778757), Pensotti Francesca (10777621) |
-| **Repository** | `https://github.com/<owner>/SE4A_Olmo_Palladino_Pensotti` |
+| **Repository** | `https://github.com/antopalla02/SE4A_LucaOlmo_AntonioPalladino_FrancescaPensotti.git` |
 
 ---
+
 ## Table of contents
 
 - [1. Introduction](#1-introduction)
@@ -41,15 +42,20 @@ Software Engineering for Automation — A.Y. 2025-2026
   - [3.2 Finite state machines](#32-finite-state-machines)
 - [4. References](#4-references)
 
+---
+
 ## Revision history
 
 | Version | Date       | Notes                                                                                   |
 |---------|------------|-----------------------------------------------------------------------------------------|
-| 0.1     | 2026-05-05 | Initial draft. Section 1 (Introduction).                                                |
-| 0.2     | 2026-05-05 | Simplified Sec. 1.2 (removed redundant *Goals* subsection). Definitions trimmed to terms used up to Sec. 1.4. |
-| 0.3     | 2026-05-05 | Added Sec. 2.1 (Scenarios) and Sec. 2.2 (Domain model).                                 |
-| 0.4     | 2026-05-05 | Sec. 2.1 rewritten in engineering style (flow-based descriptions, preconditions, exceptions). Sec. 2.2 unchanged. |
-| 0.5     | 2026-07-07 | Complete revision 
+| 0.1     | 2026-05-06 | Initial draft. Section 1 (Introduction).                                                |
+| 0.2     | 2026-05-13 | Added Section 2.1 2.2 |
+| 0.3     | 2026-05-21 | Added Section 2.3 2.4 2.5 2.6 3.1 3.2 | 
+| 1.0     | 2026-07-08 | Added Section 4 + Revision |
+| 1.1     | 2026-07-11 | Minor fixes |
+| 1.2     | 2026-07-13 | Final version |
+
+---
 
 ## 1. Introduction
 
@@ -97,6 +103,7 @@ The points of contact between the world and the machine are listed below. We dis
 - **WP6** — A client marks a project as completed.
 - **WP7** — A user submits a review at the end of a collaboration.
 - **WP8** — A user runs a manual search with filters.
+- **WP9** — A client updates the title and/or description of one of their `open` projects.
 
 **Controlled by the machine**
 
@@ -155,6 +162,8 @@ The remainder of this document is organised as follows.
 
 **Section 4 (References)** lists the external sources cited throughout the document.
 
+---
+
 ## 2. Overall description
 
 ### 2.1 Scenarios
@@ -182,6 +191,8 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Incomplete mandatory fields.* The system refuses to persist the profile and reports the missing fields; the user remains in an unauthenticated or partially configured state.
 - *Skill not present in the catalogue.* The freelancer can request the addition of a new `Skill`; until the request is approved, the corresponding `Competence` is not used by the matching.
 
+---
+
 #### S2 — Project publication and computation of the candidate ranking
 
 **Primary actor.** An authenticated `Client`.
@@ -200,6 +211,8 @@ The scenarios cover the lifecycle of the system from registration to review and 
 **Alternatives and exceptions.**
 - *No freelancer satisfies the hard filters.* The system creates the project with an empty ranking and informs the client. The project remains open for manual applications.
 - *Profile updates after publication.* If a freelancer updates the profile in a way that would have made them eligible for a project still in `open` state, the matching is recomputed for that project (the trigger is on profile-update events as well, per the *Observer* contract in Deliverable 2).
+
+---
 
 #### S3 — Submission of a proposal by a freelancer
 
@@ -220,6 +233,8 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Project moved to* `inProgress` *between display and submission* (i.e. another proposal was accepted in the meantime). Same handling as the previous case.
 - *Duplicate proposal* (R14). The system rejects the second submission and points the freelancer to the existing one.
 
+---
+
 #### S4 — Acceptance of a proposal and transition to `inProgress`
 
 **Primary actor.** The `Client` owner of the project.
@@ -239,6 +254,8 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Concurrent acceptance attempts.* The transitions in step 3 are serialised; the second attempt observes `status ≠ open` and is rejected.
 - *Cancellation by the client before acceptance.* (Out of scope of this iteration; an open project can only transition to `inProgress` or remain `open` until the deadline.)
 
+---
+
 #### S5 — Completion of the collaboration and mutual review
 
 **Primary actor.** The `Client` owner of the project (for completion); both parties (for the review).
@@ -257,6 +274,8 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *One party never submits the review.* The system does not block the lifecycle: the missing review simply does not exist; the existing one is still recorded and counted.
 - *Attempt to edit a submitted review.* The system rejects the modification (review is single-shot by definition).
 
+---
+
 #### S6 — Manual search and filtered browsing
 
 **Primary actor.** Any authenticated user.
@@ -274,8 +293,30 @@ The scenarios cover the lifecycle of the system from registration to review and 
 - *Empty result set.* The system returns the empty list with an explicit indication; no error.
 - *Filter values inconsistent with the catalogue* (e.g. budget range that no project satisfies). Same handling as empty result set.
 
+---
 
-The flows above span every shared phenomenon listed in Sec. 1.2.2 at least once: WP1, WP3 in S1; WP2 in S2; WP4 in S3 (and reused in S6 as the entry point); WP5 in S4; WP6, WP7 in S5; WP8 in S6; MP1 and MP3 are exercised in multiple scenarios (S2, S3, S4, S5); MP2 in S2; MP4 is implicitly exercised whenever any scenario produces a state change; MP5 in S5.
+#### S7 — Editing a project's title or description
+
+**Primary actor.** The `Client` owner of the project.
+
+**Preconditions.** The project exists, its `status = open`, and the actor is the `Client` who published it.
+
+**Main flow.**
+1. The client opens one of their published, still-`open` projects and edits the title and/or the description *(WP9)*.
+2. The system checks that the actor is the owner of the project (R42) and that the project is still `open`.
+3. The system updates the title and/or the description of the `Project`, leaving every other field — including `status`, required skills, budget, deadline and any received proposals — unchanged.
+4. The system persists the change and returns the resulting state of the `Project` (R41).
+
+**Postconditions.** The `Project`'s title and/or description reflect the edit; nothing else about the project is affected. No notification is generated: unlike publication or acceptance, this edit does not concern any other actor while the project is still open and unassigned.
+
+**Alternatives and exceptions.**
+- *Project no longer open.* If the project has transitioned to `inProgress` or `completed`, the edit is rejected: once a freelancer's proposal is accepted, the terms it was accepted under must remain stable.
+- *Actor is not the owner.* The system rejects the request (R42).
+- *Neither field supplied.* The system accepts the request as a no-op and returns the project unchanged.
+
+---
+
+The flows above span every shared phenomenon listed in Sec. 1.2.2 at least once: WP1, WP3 in S1; WP2 in S2; WP4 in S3 (and reused in S6 as the entry point); WP5 in S4; WP6, WP7 in S5; WP8 in S6; WP9 in S7; MP1 and MP3 are exercised in multiple scenarios (S2, S3, S4, S5); MP2 in S2; MP4 is implicitly exercised whenever any scenario produces a state change; MP5 in S5.
 
 
 ### 2.2 Domain model
@@ -322,6 +363,8 @@ A freelancer is expected to interact with the platform more frequently than a cl
  
 A freelancer has a direct incentive to see good work reflected back into future opportunities: reputation accumulated from past collaborations is not just a display value but a live input to every subsequent ranking computed for that freelancer *(G4, R33, R40)*. As with the client, when the automatic ranking does not surface every project a freelancer would consider, manual search remains available as a fallback *(R28, G5)*.
 
+---
+
 ### 2.4 Product functions
 
 This section enumerates the functional requirements of the system. Requirements are labelled `R1`, `R2`, …, and are grouped by macro-area so that each cluster corresponds to a coherent slice of the system. Within each group, every requirement is stated in a single "shall" sentence; cross-references to the scenarios of Sec. 2.1, to the goals of Sec. 1.1, to the shared phenomena of Sec. 1.2.2 and to the domain assumptions of Sec. 2.6.1 (where a requirement's correctness relies on one) are collected in the traceability matrix of Sec. 2.4.8.
@@ -337,7 +380,7 @@ This section enumerates the functional requirements of the system. Requirements 
 - **R7** — The system shall persist a profile change before returning control to the user.
 - **R8** — The system shall maintain a controlled vocabulary of `Skill`s.
 - **R9** — The system shall reject any `Competence` referring to a `Skill` not present in the controlled vocabulary.
-- **R10** — The system shall allow a user to request the addition of a new `Skill` to the controlled vocabulary, subject to administrator approval.
+- **R10** — The system shall allow a user to request the addition of a new `Skill`, and shall keep the request pending until an administrator approves it.
 
 #### 2.4.2 Project lifecycle
 
@@ -394,8 +437,58 @@ This section enumerates the functional requirements of the system. Requirements 
 - **R45** — The system shall allow the `Client` owner of an `open` `Project` to update its title and description.
 
 #### 2.4.8 Traceability matrix
-![Traceability matrix — Figure 1](images/traceability_matrix.png)
 
+The table below maps every functional requirement to the goal(s) it refines (Sec. 1.1), the scenario(s) that exercise it (Sec. 2.1), the shared phenomenon it realises (Sec. 1.2.2), and the domain assumption its correctness relies on, where one exists (Sec. 2.6.1).
+
+| Req. | Goal(s) | Scenario(s) | Shared phenomenon | Assumption |
+|---|---|---|---|---|
+| R1  | G1, G2 | S1 | WP1 | DOM4 |
+| R2  | G1, G2 | S1 | WP1 | DOM4 |
+| R3  | G1, G2 | S1 | WP1 | — |
+| R4  | G1, G2 | S1 | WP3 | — |
+| R5  | G1, G2 | S1 | WP3 | DOM1 |
+| R6  | G1, G2 | S1 | WP3 | — |
+| R7  | G1, G2 | S1 | WP3 | — |
+| R8  | G1, G2 | S1 | WP3 | DOM5 |
+| R9  | G1, G2 | S1 | WP3 | DOM5 |
+| R10 | G1, G2 | S1 | WP3 | DOM5 |
+| R11 | G3 | S2 | WP2 | DOM1 |
+| R12 | G3 | S2 | WP2 | — |
+| R13 | G3 | S3 | WP4 | — |
+| R14 | G3 | S3 | WP4 | — |
+| R15 | G3 | S4 | WP5 | — |
+| R16 | G3 | S4 | WP5 | — |
+| R17 | G3 | S3, S4 | WP4 | — |
+| R18 | G3 | S5 | WP6 | DOM2 |
+| R19 | G1 | S2 | MP1 | DOM1 |
+| R20 | G1 | S2 | MP1 | — |
+| R21 | G2 | S1 | MP2 | — |
+| R22 | G2 | S2 | MP2 | — |
+| R23 | G1 | S1 | MP2 | — |
+| R24 | G1, G2 | S2 | MP1, MP2 | DOM1 |
+| R25 | G1, G2 | S2 | MP1, MP2 | — |
+| R26 | G1, G2 | S2 | MP1, MP2 | — |
+| R27 | G5 | S6 | WP8 | — |
+| R28 | G5 | S6 | WP8 | — |
+| R29 | G5 | S6 | WP8 | — |
+| R30 | G3, G4 | S5 | WP6 | — |
+| R31 | G4 | S5 | WP7 | DOM3 |
+| R32 | G4 | S5 | WP7 | DOM3 |
+| R33 | G4 | S5 | MP5 | DOM3 |
+| R34 | G4 | S5 | MP5 | — |
+| R35 | G2 | S2 | MP3 | — |
+| R36 | G3 | S3 | MP3 | — |
+| R37 | G3 | S4 | MP3 | — |
+| R38 | G3, G4 | S5 | MP3 | — |
+| R39 | G3 | (all) | MP4 | — |
+| R40 | G4 | (all) | MP4 | — |
+| R41 | — | (all) | — | — |
+| R42 | — | (all) | — | — |
+| R43 | — | S1 | — | — |
+| R44 | G1, G2 | S2 | — | — |
+| R45 | G3 | S7 | WP9 | — |
+
+---
 
 ### 2.5 Non-functional aspects
 
@@ -418,6 +511,8 @@ The following non-functional requirements (NFR) are organised by the ISO/IEC 250
 - **NFR6** — A first-time user shall be able to complete registration and profile setup within 5 minutes without external assistance, in ≥ 90% of cases.
 
 **Note:** At this stage of the project, none of the non-functional requirements above has been verified against a running system: doing so — measuring response times under load, monthly uptime, or first-time-user completion rates — requires a deployed instance and, in several cases, real users or realistic traffic, which are not available yet. The NFRs are nonetheless stated here, with concrete thresholds, to make explicit what a production-quality version of the system would be expected to satisfy. For this reason, the numeric thresholds (95th percentile, uptime percentages, time limits) should be read as indicative reference values rather than as figures that have been measured or validated.
+
+---
 
 ### 2.6 Assumptions, dependencies and constraints
 
@@ -448,6 +543,8 @@ The following assumptions are about the *world* and the system cannot enforce th
 - **C5** — The compatibility-score weights and the size *N* of the ranking truncation are configuration parameters, not user-facing settings. The decision of when and how to retune them is taken by the administrator.
 - **C6** — The matching algorithm is intended to operate on the catalogue of profiles available on the platform; it does not consult external sources (e.g. professional networks, public CVs).
 
+---
+
 ## 3. Additional models
 
 This section refines a small number of requirements with additional UML models, where a textual flow alone would leave room for ambiguity. The criterion for including a diagram in this section is simple: the diagram is included only when it adds information that is not already evident from the scenarios of Sec. 2.1 or the requirements of Sec. 2.4. Scenarios whose flow is fully captured by the textual description in Sec. 2.1 are not duplicated as sequence diagrams here.
@@ -456,7 +553,7 @@ This section refines a small number of requirements with additional UML models, 
 
 Two sequence diagrams are included, corresponding to the two scenarios in which the interaction between the actors and the system involves multiple steps and side effects that are not immediately visible from the text of Sec. 2.1: the publication of a project with the cascading update of the suggested rankings (S2), and the acceptance of a proposal with the atomic transition and the cascade of rejection notifications (S4).
 
-The remaining scenarios — S1 (registration), S3 (single-actor proposal submission), S5 (review submission), S6 (manual search) — are not depicted as sequence diagrams: each of them consists of a single round-trip between an actor and the system, with no propagation of effects to third parties, and the textual description in Sec. 2.1 is already self-contained.
+The remaining scenarios — S1 (registration), S3 (single-actor proposal submission), S5 (review submission), S6 (manual search), S7 (project metadata edit) — are not depicted as sequence diagrams: each of them consists of a single round-trip between an actor and the system, with no propagation of effects to third parties, and the textual description in Sec. 2.1 is already self-contained.
 
 #### 3.1.1 S2 — Project publication and matching
 
@@ -476,7 +573,7 @@ Two domain entities have a lifecycle whose transitions are non-trivial and are r
 
 #### 3.2.1 Project lifecycle
 
-Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `inProgress`, `completed`) and only two non-trivial transitions: `open → inProgress` (triggered by the acceptance of a proposal, R15/R16) and `inProgress → completed` (triggered by the client marking the project as completed, R18). The state `open` admits a self-transition corresponding to updates of the project's own metadata (R45), allowed while the project has not yet entered the in-progress phase. The state `completed` is terminal as far as the `Project` itself is concerned: the subsequent submission of reviews is governed by the lifecycle of `Review`, which is intentionally not included here as a separate FSM because it consists of a single state transition (a `Review` is either submitted or it does not exist, and once submitted it cannot be modified — see R32).
+Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `inProgress`, `completed`) and only two non-trivial transitions: `open → inProgress` (triggered by the acceptance of a proposal, R15/R16) and `inProgress → completed` (triggered by the client marking the project as completed, R18). The state `open` admits a self-transition corresponding to updates of the project's own metadata (R45, S7, WP9), allowed while the project has not yet entered the in-progress phase. The state `completed` is terminal as far as the `Project` itself is concerned: the subsequent submission of reviews is governed by the lifecycle of `Review`, which is intentionally not included here as a separate FSM because it consists of a single state transition (a `Review` is either submitted or it does not exist, and once submitted it cannot be modified — see R32).
 
 ![Project FSM — Figure 4](images/fsm_project.png)
 
@@ -485,6 +582,8 @@ Figure 4 shows the lifecycle of a `Project`. There are three states (`open`, `in
 Figure 5 shows the lifecycle of a `Proposal`. There are three states (`pending`, `accepted`, `rejected`). The transition from `pending` to `accepted` corresponds to the explicit choice of the client owner of the parent project. The transition from `pending` to `rejected` has two sources: the explicit rejection of a proposal is not foreseen as a separate action in this iteration of the system (a client can only accept; the rejection of the other proposals is a cascading effect of the acceptance, R16). Both terminal states are final: once a proposal is accepted or rejected, it cannot be reverted (R15 admits at most one accepted proposal per project, and a rejected proposal is not allowed to be re-evaluated).
 
 ![Proposal FSM — Figure 5](images/fsm_proposal.png)
+
+---
 
 ## 4. References
 
@@ -497,5 +596,3 @@ The references listed below are the sources cited explicitly or implicitly throu
 - **[5]** E. Gamma, R. Helm, R. Johnson, and J. Vlissides, *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley, 1994. — Source for the *Strategy* and *Observer* patterns referenced by R26 and by Sec. 3.1.
 - **[6]** M. Fowler, *Patterns of Enterprise Application Architecture*. Addison-Wesley, 2002. — Source for the *Repository* pattern that will be used in Deliverable 2 and that motivates the data-access boundary mentioned in Sec. 2.6.2.
 - **[7]** M. Camilli, *Software Engineering for Automation — Project Guideline, A.Y. 2024-2025*. Politecnico di Milano, 2024. — Source for the structure of this document and the deliverables that follow.
-- **[8]** M. Camilli, *Software Engineering for Automation — Course Slides: Requirements Engineering (SE4A_06_RE); Object Orientation I–II (SE4A_03/04_OO)*. Politecnico di Milano, A.Y. 2024–2025. — Source for the functional/non-functional/constraint taxonomy and the verifiability criterion applied throughout Sec. 2.4–2.6, and for the UML notation choices (association class, composition, roles) applied to the domain model of Sec. 2.2.
-
