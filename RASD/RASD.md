@@ -108,7 +108,7 @@ The points of contact between the world and the machine are listed below. We dis
 
 **Controlled by the machine**
 
-- **MP1** — The system shows to a client the ranked list of freelancers suggested for a project.
+- **MP1** — The system shows to a client the list of freelancers suggested for a project.
 - **MP2** — The system shows to a freelancer the ranked list of projects compatible with the freelancer profile.
 - **MP3** — The system sends notifications when relevant events happen (new compatible project, new proposal, proposal accepted or rejected, project completed, review window opened).
 - **MP4** — The system displays a personal dashboard to each user.
@@ -243,7 +243,7 @@ The scenarios cover the lifecycle of the system from registration to review and 
 **Preconditions.** The project has `status = open` and at least one `Proposal` with `status = pending`.
 
 **Main flow.**
-1. The client inspects the list of received proposals, ordered by *S(P,F)* *(MP1)*.
+1. The client inspects the list of received proposals.
 2. The client accepts one specific proposal *(WP5)*.
 3. The system performs, atomically with respect to other lifecycle transitions of the same project: (i) sets the chosen proposal's `status` to `accepted`; (ii) sets every other pending proposal of the same project to `status = rejected`; (iii) sets the project's `status` to `inProgress`. This sequence realises R15 (at most one accepted proposal per project) and R16 (the transition, including the project status update, is atomic).
 4. The system delivers an "accepted" notification to the chosen freelancer and a "rejected" notification to every other involved freelancer *(MP3)*.
