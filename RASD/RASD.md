@@ -53,7 +53,8 @@ Software Engineering for Automation — A.Y. 2025-2026
 | 0.3     | 2026-05-21 | Added Section 2.3 2.4 2.5 2.6 3.1 3.2 | 
 | 1.0     | 2026-07-08 | Added Section 4 + Revision |
 | 1.1     | 2026-07-11 | Minor fixes |
-| 1.2     | 2026-07-13 | Final version |
+| 1.2     | 2026-07-13 | General review |
+| 1.3     | 2026-07-14 | Minor fixes |
 
 ---
 
@@ -197,7 +198,7 @@ The scenarios cover the lifecycle of the system from registration to review and 
 
 **Primary actor.** An authenticated `Client`.
 
-**Preconditions.** The client has at least one valid payment-and-contact configuration on the profile (the system does not collect payments, but the contact information must be present).
+**Preconditions.** The client has at least one valid contact configuration on the profile.
 
 **Main flow.**
 1. The client submits a new project specifying: title, description, set of required `Skill`s, maximum budget, application deadline *(WP2)*.
