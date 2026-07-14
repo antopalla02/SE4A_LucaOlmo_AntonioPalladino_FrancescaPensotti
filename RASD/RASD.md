@@ -322,7 +322,7 @@ The flows above span every shared phenomenon listed in Sec. 1.2.2 at least once:
 
 ### 2.2 Domain model
 
-This section formalises the entities of the application domain and the relationships between them. The model is intentionally kept at the conceptual level: it captures *what* the system has to talk about, not *how* it stores it. Figure 1 shows the resulting UML class diagram. The PlantUML source is in `diagrams/domain_model.puml`.
+This section formalises the entities of the application domain and the relationships between them. The model is intentionally kept at the conceptual level: it captures *what* the system has to talk about, not *how* it stores it. Figure 1 shows the resulting UML class diagram. The PlantUML source is in `images/domain_model.puml`.
 
 ![Domain model — Figure 1](images/domain_model.png)
 
