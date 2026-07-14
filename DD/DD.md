@@ -425,9 +425,9 @@ this requires: the domain must be fully decoupled from how its data is
 stored. 
 
 **Mechanism.** This decoupling is realised through interfaces:
-`application` and `domain` depend only on `IMatchingStrategy`,
+`application` depens only on `IMatchingStrategy`,
 `IEventBus`, and `IRepository` — never on a concrete implementation — and
-communicate with the outer layers exclusively through them.
+communicates with the outer layers exclusively through them.
  A single
 composition root is responsible for choosing which implementation to
 plug in: it reads the configuration to build the matching strategy, and
