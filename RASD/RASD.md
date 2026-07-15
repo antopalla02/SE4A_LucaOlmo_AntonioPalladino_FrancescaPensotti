@@ -594,7 +594,7 @@ The references listed below are the sources cited explicitly or implicitly throu
 - **[1]** M. Jackson, *The World and the Machine*, in Proc. of the 17th International Conference on Software Engineering (ICSE '95), Seattle, WA, USA, IEEE Computer Society, 1995, pp. 283–292. — Source for the world/machine distinction used in Sec. 1.2.
 - **[2]** A. van Lamsweerde, *Requirements Engineering: From System Goals to UML Models to Software Specifications*. Wiley, 2009. — Reference for the goal-oriented framing of Sec. 1.1 (G1–G5) and for the structure of the scenarios in Sec. 2.1.
 - **[3]** Object Management Group, *OMG Unified Modeling Language (OMG UML), Version 2.5.1*, formal/2017-12-05, December 2017. Available: https://www.omg.org/spec/UML/2.5.1 — Notation reference for all UML diagrams (Sec. 2.2, Sec. 3).
-- **[4]** PlantUML Reference Guide. Available: https://plantuml.com (last accessed: 2026-05-05). — Tool used to author the diagram sources committed in `diagrams/`.
+- **[4]** PlantUML Reference Guide. Available: https://plantuml.com 
 - **[5]** E. Gamma, R. Helm, R. Johnson, and J. Vlissides, *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley, 1994. — Source for the *Strategy* and *Observer* patterns referenced by R26 and by Sec. 3.1.
 - **[6]** M. Fowler, *Patterns of Enterprise Application Architecture*. Addison-Wesley, 2002. — Source for the *Repository* pattern that will be used in Deliverable 2 and that motivates the data-access boundary mentioned in Sec. 2.6.2.
 - **[7]** M. Camilli, *Software Engineering for Automation — Project Guideline, A.Y. 2024-2025*. Politecnico di Milano, 2024. — Source for the structure of this document and the deliverables that follow.
