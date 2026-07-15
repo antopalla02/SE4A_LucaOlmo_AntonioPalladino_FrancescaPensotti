@@ -494,7 +494,7 @@ The table below maps every functional requirement to the goal(s) it refines (Sec
 
 ### 2.5 Non-functional aspects
 
-The following non-functional requirements (NFR) are organised by the ISO/IEC 25010 quality characteristics relevant to this system: Performance, Reliability and availability, and Usability. Each predicates over a quality axis that is independent of functional correctness — the system can be functionally correct and still score anywhere along that axis (e.g. correct but slow, correct but occasionally unreachable). They are stated at a level of detail sufficient to guide the architectural decisions in Deliverable 2 and the testing strategy in Deliverable 3.
+The following non-functional requirements (NFR) are organised by the ISO/IEC 25010 quality characteristics relevant to this system: Performance, Reliability and availability, and Usability. Each predicates over a quality axis that is independent of functional correctness — the system can be functionally correct and still score anywhere along that axis (e.g. correct but slow, correct but occasionally unreachable). 
 
 
 ### 2.5.1 Performance
