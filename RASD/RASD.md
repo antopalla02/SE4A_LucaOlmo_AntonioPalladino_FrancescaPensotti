@@ -55,6 +55,7 @@ Software Engineering for Automation — A.Y. 2025-2026
 | 1.1     | 2026-07-11 | Minor fixes |
 | 1.2     | 2026-07-13 | General review |
 | 1.3     | 2026-07-14 | Minor fixes |
+| 1.4     | 2026-07-15 | Final Version |
 
 ---
 
@@ -360,7 +361,7 @@ Freelancers are expected to know their own profession well enough to characteris
  
 A freelancer is expected to submit proposals to several `Project`s concurrently and, for each one, to expect a definite, timely outcome rather than an indefinitely pending state *(R37, R16)*.
  
-A freelancer is expected to interact with the platform more frequently than a client: profile maintenance, inspection of suggested projects, application to one or more of them, follow-up on pending proposals *(NFR1, NFR3)*.
+A freelancer is expected to interact with the platform more frequently than a client: profile maintenance, inspection of suggested projects, application to one or more of them, follow-up on pending proposals.
  
 A freelancer has a direct incentive to see good work reflected back into future opportunities: reputation accumulated from past collaborations is not just a display value but a live input to every subsequent ranking computed for that freelancer *(G4, R33, R40)*. As with the client, when the automatic ranking does not surface every project a freelancer would consider, manual search remains available as a fallback *(R28, G5)*.
 
