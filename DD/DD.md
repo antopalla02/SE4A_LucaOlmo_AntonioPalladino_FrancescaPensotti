@@ -187,7 +187,7 @@ Two implementations are provided, serving different purposes:
 
 - **SQLite implementation** — used at runtime. It realises the
   `IRepository` interfaces, handling all database access and converting
-  between ORM rows and domain entities in both directions (`save()` maps
+  between ORM rows and domain entities in both directions (eg. `save()` maps
   entities to rows, `get()`/`get_with_proposals()` reconstructs entities
   from rows). Choosing SQLite as the data store is what satisfies DEP1,
   since it provides the transactional guarantees that dependency
